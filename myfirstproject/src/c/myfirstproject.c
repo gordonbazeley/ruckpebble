@@ -37,41 +37,45 @@ static Settings s_settings;
 static time_t s_start_time;
 static bool s_health_available = false;
 
-static double prv_weight_to_kg(int32_t value_tenths, int32_t unit) {
-  double value = (double)value_tenths / 10.0;
+static int64_t prv_weight_to_kg1000(int32_t value_tenths, int32_t unit) {
   if (unit == 1) {
-    return value * 0.453592;
+    return ((int64_t)value_tenths * 453592) / 10;
   }
-  return value;
+  return (int64_t)value_tenths * 100;
 }
 
-static double prv_stride_to_m(int32_t value_tenths, int32_t unit) {
-  double value = (double)value_tenths / 10.0;
+static int64_t prv_stride_to_mm(int32_t value_tenths, int32_t unit) {
   if (unit == 1) {
-    return value * 0.0254;
+    return ((int64_t)value_tenths * 254) / 10;
   }
-  return value / 100.0;
+  return (int64_t)value_tenths;
 }
 
-static double prv_grade_fraction(void) {
-  return (double)s_settings.grade_percent / 1000.0;
+static int64_t prv_grade_q(void) {
+  return (int64_t)s_settings.grade_percent * 100;
 }
 
-static double prv_terrain_factor(void) {
-  return (double)s_settings.terrain_factor / 100.0;
-}
-
-static double prv_pandolf_metabolic_rate(double weight_kg, double load_kg, double speed_mps) {
-  if (weight_kg <= 0.0) {
-    return 0.0;
+static int64_t prv_pandolf_metabolic_mw(int64_t weight_kg1000, int64_t load_kg1000, int64_t speed_mmps) {
+  if (weight_kg1000 <= 0) {
+    return 0;
   }
-  double grade = prv_grade_fraction();
-  double mu = prv_terrain_factor();
-  double total = weight_kg + load_kg;
-  double load_ratio = load_kg / weight_kg;
-  double term1 = 1.5 * weight_kg;
-  double term2 = 2.0 * total * load_ratio * load_ratio;
-  double term3 = mu * total * (1.5 * speed_mps * speed_mps + 0.35 * speed_mps * grade);
+  int64_t total = weight_kg1000 + load_kg1000;
+  int64_t ratio_q = (load_kg1000 * 1000000) / weight_kg1000;
+  int64_t ratio_sq_q = (ratio_q * ratio_q) / 1000000;
+  int64_t term1 = (weight_kg1000 * 3) / 2;
+  int64_t term2 = (2 * total * ratio_sq_q) / 1000000;
+
+  int64_t v_q = speed_mmps;          // m/s * 1000
+  int64_t v2_q = v_q * v_q;          // scale 1e6
+  int64_t termA_q = (v2_q * 3) / 2;  // scale 1e6
+  int64_t G_q = prv_grade_q();       // scale 1e4
+  int64_t termB_q = v_q * G_q;       // scale 1e7
+  termB_q = (termB_q * 35) / 100;    // scale 1e7
+  termB_q = termB_q / 10;            // scale 1e6
+  int64_t inner_q = termA_q + termB_q;
+  int64_t mu_q = s_settings.terrain_factor; // scale 1e2
+  int64_t term3 = (total * inner_q * mu_q) / (100 * 1000000);
+
   return term1 + term2 + term3;
 }
 
@@ -88,9 +92,9 @@ static void prv_save_settings(void) {
 
 static void prv_update_display(void) {
   time_t now = time(NULL);
-  double elapsed_s = difftime(now, s_start_time);
-  if (elapsed_s < 1.0) {
-    elapsed_s = 1.0;
+  int64_t elapsed_s = (int64_t)difftime(now, s_start_time);
+  if (elapsed_s < 1) {
+    elapsed_s = 1;
   }
 
   int32_t steps = 0;
@@ -98,24 +102,25 @@ static void prv_update_display(void) {
     steps = (int32_t)health_service_sum(HealthMetricStepCount, s_start_time, now);
   }
 
-  double stride_m = prv_stride_to_m(s_settings.stride_value, s_settings.stride_unit);
-  double distance_m = steps * stride_m;
-  double speed_mps = distance_m / elapsed_s;
+  int64_t stride_mm = prv_stride_to_mm(s_settings.stride_value, s_settings.stride_unit);
+  int64_t distance_mm = (int64_t)steps * stride_mm;
+  int64_t speed_mmps = distance_mm / elapsed_s;
 
   bool use_imperial = (s_settings.weight_unit == 1);
-  double distance_unit = use_imperial ? (distance_m / 1609.344) : (distance_m / 1000.0);
+  int64_t unit_mm = use_imperial ? 1609344 : 1000000;
   const char *distance_unit_label = use_imperial ? "mi" : "km";
+  int64_t distance_x100 = (distance_mm * 100) / unit_mm;
 
-  double pace_sec = 0.0;
-  if (distance_unit > 0.0001) {
-    pace_sec = elapsed_s / distance_unit;
+  int64_t pace_sec = 0;
+  if (distance_mm > 0) {
+    pace_sec = (elapsed_s * unit_mm) / distance_mm;
   }
 
-  double weight_kg = prv_weight_to_kg(s_settings.weight_value, s_settings.weight_unit);
-  double load_kg = prv_weight_to_kg(s_settings.ruck_weight_value, s_settings.ruck_weight_unit);
-  double metabolic_watts = prv_pandolf_metabolic_rate(weight_kg, load_kg, speed_mps);
-  double kcal_per_hour = metabolic_watts * 3600.0 / 4184.0;
-  double kcal_total = kcal_per_hour * (elapsed_s / 3600.0);
+  int64_t weight_kg1000 = prv_weight_to_kg1000(s_settings.weight_value, s_settings.weight_unit);
+  int64_t load_kg1000 = prv_weight_to_kg1000(s_settings.ruck_weight_value, s_settings.ruck_weight_unit);
+  int64_t metabolic_mw = prv_pandolf_metabolic_mw(weight_kg1000, load_kg1000, speed_mmps);
+  int64_t kcal_per_hour = (metabolic_mw * 3600) / 4184 / 1000;
+  int64_t kcal_total = (kcal_per_hour * elapsed_s) / 3600;
 
   static char distance_buf[32];
   static char pace_buf[32];
@@ -123,11 +128,15 @@ static void prv_update_display(void) {
   static char cal_buf[32];
   static char total_buf[32];
 
-  snprintf(distance_buf, sizeof(distance_buf), "Dist: %.2f %s", distance_unit, distance_unit_label);
-  if (pace_sec > 0.0) {
-    int pace_min = (int)(pace_sec / 60.0);
-    int pace_rem = (int)pace_sec % 60;
-    snprintf(pace_buf, sizeof(pace_buf), "Pace: %d:%02d /%s", pace_min, pace_rem, distance_unit_label);
+  int64_t dist_int = distance_x100 / 100;
+  int64_t dist_frac = llabs(distance_x100 % 100);
+  snprintf(distance_buf, sizeof(distance_buf), "Dist: %ld.%02ld %s",
+           (long)dist_int, (long)dist_frac, distance_unit_label);
+  if (pace_sec > 0) {
+    int pace_min = (int)(pace_sec / 60);
+    int pace_rem = (int)(pace_sec % 60);
+    snprintf(pace_buf, sizeof(pace_buf), "Pace: %d:%02d /%s",
+             pace_min, pace_rem, distance_unit_label);
   } else {
     snprintf(pace_buf, sizeof(pace_buf), "Pace: --");
   }
@@ -137,8 +146,8 @@ static void prv_update_display(void) {
   } else {
     snprintf(steps_buf, sizeof(steps_buf), "Steps: N/A");
   }
-  snprintf(cal_buf, sizeof(cal_buf), "Cal/h: %.0f", kcal_per_hour);
-  snprintf(total_buf, sizeof(total_buf), "Total: %.0f", kcal_total);
+  snprintf(cal_buf, sizeof(cal_buf), "Cal/h: %ld", (long)kcal_per_hour);
+  snprintf(total_buf, sizeof(total_buf), "Total: %ld", (long)kcal_total);
 
   text_layer_set_text(s_distance_layer, distance_buf);
   text_layer_set_text(s_pace_layer, pace_buf);
