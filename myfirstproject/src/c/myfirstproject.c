@@ -1,18 +1,8 @@
 #include <pebble.h>
 
-#ifndef MESSAGE_KEY_weight_value
-enum {
-  MESSAGE_KEY_weight_value = 0,
-  MESSAGE_KEY_weight_unit,
-  MESSAGE_KEY_ruck_weight_value,
-  MESSAGE_KEY_ruck_weight_unit,
-  MESSAGE_KEY_stride_length_value,
-  MESSAGE_KEY_stride_length_unit,
-  MESSAGE_KEY_terrain_factor,
-  MESSAGE_KEY_grade_percent,
-  MESSAGE_KEY_sim_steps_enabled,
-  MESSAGE_KEY_sim_steps_spm
-};
+#ifndef MESSAGE_KEY_sim_steps_enabled
+#define MESSAGE_KEY_sim_steps_enabled 8
+#define MESSAGE_KEY_sim_steps_spm 9
 #endif
 
 typedef struct {
