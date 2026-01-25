@@ -32,8 +32,8 @@ static const Settings SETTINGS_DEFAULTS = {
   .terrain_factor = 100,
   .grade_percent = 0,
   .sim_steps_enabled = 1,
-  .sim_steps_spm = 488
-  /* .sim_steps_spm = 122 */
+  .sim_steps_spm = 122
+  /* .sim_steps_spm = 488 */
 };
 
 static Window *s_window;
