@@ -53,7 +53,7 @@ static int64_t s_speed_mmps = 0;
 
 static int64_t prv_weight_to_kg1000(int32_t value_tenths, int32_t unit) {
   if (unit == 1) {
-    return ((int64_t)value_tenths * 453592) / 10;
+    return ((int64_t)value_tenths * 453592) / 10000;
   }
   return (int64_t)value_tenths * 100;
 }
