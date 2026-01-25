@@ -11,17 +11,20 @@
     "sdkVersion": "3",
     "enableMultiJS": true,
     "targetPlatforms": [
-      "aplite",
-      "basalt",
-      "chalk",
-      "diorite",
       "emery"
     ],
     "watchapp": {
       "watchface": false
     },
     "messageKeys": [
-      "dummy"
+      "weight_value",
+      "weight_unit",
+      "ruck_weight_value",
+      "ruck_weight_unit",
+      "stride_length_value",
+      "stride_length_unit",
+      "terrain_factor",
+      "grade_percent"
     ],
     "resources": {
       "media": []
