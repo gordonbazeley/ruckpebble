@@ -92,7 +92,7 @@ static void prv_save_settings(void) {
 
 static void prv_update_display(void) {
   time_t now = time(NULL);
-  int64_t elapsed_s = (int64_t)difftime(now, s_start_time);
+  int64_t elapsed_s = (int64_t)(now - s_start_time);
   if (elapsed_s < 1) {
     elapsed_s = 1;
   }
@@ -129,7 +129,10 @@ static void prv_update_display(void) {
   static char total_buf[32];
 
   int64_t dist_int = distance_x100 / 100;
-  int64_t dist_frac = llabs(distance_x100 % 100);
+  int64_t dist_frac = distance_x100 % 100;
+  if (dist_frac < 0) {
+    dist_frac = -dist_frac;
+  }
   snprintf(distance_buf, sizeof(distance_buf), "Dist: %ld.%02ld %s",
            (long)dist_int, (long)dist_frac, distance_unit_label);
   if (pace_sec > 0) {
