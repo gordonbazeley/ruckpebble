@@ -42,6 +42,7 @@ static TextLayer *s_pace_layer;
 static TextLayer *s_steps_layer;
 static TextLayer *s_calories_layer;
 static TextLayer *s_total_layer;
+static TextLayer *s_debug_layer;
 
 static Settings s_settings;
 static time_t s_start_time;
@@ -51,6 +52,8 @@ static int32_t s_steps_baseline = 0;
 static int32_t s_last_steps = 0;
 static time_t s_last_time = 0;
 static int64_t s_speed_mmps = 0;
+static int64_t s_last_mult_q = 0;
+static int64_t s_last_ratio_q = 0;
 
 static int64_t prv_weight_to_kg1000(int32_t value_tenths, int32_t unit) {
   if (unit == 1) {
@@ -67,7 +70,27 @@ static int64_t prv_stride_to_mm(int32_t value_tenths, int32_t unit) {
 }
 
 static int64_t prv_grade_q(void) {
-  return (int64_t)s_settings.grade_percent * 100;
+  return (int64_t)s_settings.grade_percent * 10;
+}
+
+static int64_t prv_isqrt(int64_t x) {
+  int64_t op = x;
+  int64_t res = 0;
+  int64_t one = (int64_t)1 << 62;
+
+  while (one > op) {
+    one >>= 2;
+  }
+  while (one != 0) {
+    if (op >= res + one) {
+      op -= res + one;
+      res = (res >> 1) + one;
+    } else {
+      res >>= 1;
+    }
+    one >>= 2;
+  }
+  return res;
 }
 
 static int64_t prv_pandolf_metabolic_mw(int64_t weight_kg1000, int64_t load_kg1000, int64_t speed_mmps) {
@@ -76,6 +99,7 @@ static int64_t prv_pandolf_metabolic_mw(int64_t weight_kg1000, int64_t load_kg10
   }
   int64_t total = weight_kg1000 + load_kg1000;
   int64_t ratio_q = (load_kg1000 * 1000000) / weight_kg1000;
+  s_last_ratio_q = ratio_q;
   int64_t ratio_sq_q = (ratio_q * ratio_q) / 1000000;
   int64_t term1 = (weight_kg1000 * 3) / 2;
   int64_t term2 = (2 * total * ratio_sq_q) / 1000000;
@@ -89,7 +113,19 @@ static int64_t prv_pandolf_metabolic_mw(int64_t weight_kg1000, int64_t load_kg10
   termB_q = termB_q / 10;            // scale 1e6
   int64_t inner_q = termA_q + termB_q;
   int64_t mu_q = s_settings.terrain_factor; // scale 1e2
-  int64_t term3 = (total * inner_q * mu_q) / (100 * 1000000);
+  int64_t term3_base = (total * inner_q * mu_q) / (100 * 1000000);
+
+  int64_t v2_03_q = (v2_q * 3) / 10;           // scale 1e6
+  int64_t sqrt_03_v2_q = prv_isqrt(v2_03_q);   // scale 1e3
+  int64_t sqrt_term_q = (sqrt_03_v2_q * 1000) / 7; // scale 1e6
+
+  int64_t v_lr_q = (v_q * ratio_q) / 1000000;  // scale 1e3
+  int64_t vl_term_q = (v_lr_q * v_lr_q) / 4;   // scale 1e6
+
+  int64_t mult_base_q = 1000000 + sqrt_term_q + vl_term_q;
+  int64_t mult_q = (mult_base_q * 11) / 10;    // scale 1e6
+  int64_t term3 = (term3_base * mult_q) / 1000000;
+  s_last_mult_q = mult_q;
 
   return term1 + term2 + term3;
 }
@@ -166,6 +202,7 @@ static void prv_update_display(void) {
   static char steps_buf[32];
   static char cal_buf[32];
   static char total_buf[32];
+  static char debug_buf[32];
 
   int64_t dist_int = distance_x100 / 100;
   int64_t dist_frac = distance_x100 % 100;
@@ -192,12 +229,18 @@ static void prv_update_display(void) {
   }
   snprintf(cal_buf, sizeof(cal_buf), "Cal/h: %ld", (long)kcal_per_hour);
   snprintf(total_buf, sizeof(total_buf), "Total: %ld", (long)kcal_total);
+  snprintf(debug_buf, sizeof(debug_buf), "V:%ld.%03ld R:%ld M:%ld",
+           (long)(speed_mmps / 1000),
+           (long)(speed_mmps % 1000),
+           (long)(s_last_ratio_q / 1000),
+           (long)(s_last_mult_q / 1000));
 
   text_layer_set_text(s_distance_layer, distance_buf);
   text_layer_set_text(s_pace_layer, pace_buf);
   text_layer_set_text(s_steps_layer, steps_buf);
   text_layer_set_text(s_calories_layer, cal_buf);
   text_layer_set_text(s_total_layer, total_buf);
+  text_layer_set_text(s_debug_layer, debug_buf);
 }
 
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
@@ -265,24 +308,28 @@ static void prv_window_load(Window *window) {
   s_steps_layer = text_layer_create(GRect(4, 50, bounds.size.w - 8, 22));
   s_calories_layer = text_layer_create(GRect(4, 72, bounds.size.w - 8, 22));
   s_total_layer = text_layer_create(GRect(4, 94, bounds.size.w - 8, 22));
+  s_debug_layer = text_layer_create(GRect(4, 116, bounds.size.w - 8, 22));
 
   text_layer_set_font(s_distance_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
   text_layer_set_font(s_pace_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
   text_layer_set_font(s_steps_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
   text_layer_set_font(s_calories_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
   text_layer_set_font(s_total_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  text_layer_set_font(s_debug_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
 
   text_layer_set_text_alignment(s_distance_layer, GTextAlignmentLeft);
   text_layer_set_text_alignment(s_pace_layer, GTextAlignmentLeft);
   text_layer_set_text_alignment(s_steps_layer, GTextAlignmentLeft);
   text_layer_set_text_alignment(s_calories_layer, GTextAlignmentLeft);
   text_layer_set_text_alignment(s_total_layer, GTextAlignmentLeft);
+  text_layer_set_text_alignment(s_debug_layer, GTextAlignmentLeft);
 
   layer_add_child(window_layer, text_layer_get_layer(s_distance_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_pace_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_steps_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_calories_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_total_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_debug_layer));
 }
 
 static void prv_window_unload(Window *window) {
@@ -291,6 +338,7 @@ static void prv_window_unload(Window *window) {
   text_layer_destroy(s_steps_layer);
   text_layer_destroy(s_calories_layer);
   text_layer_destroy(s_total_layer);
+  text_layer_destroy(s_debug_layer);
 }
 
 static void prv_init(void) {
