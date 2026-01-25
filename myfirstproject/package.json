@@ -24,7 +24,9 @@
       "stride_length_value",
       "stride_length_unit",
       "terrain_factor",
-      "grade_percent"
+      "grade_percent",
+      "sim_steps_enabled",
+      "sim_steps_spm"
     ],
     "resources": {
       "media": []

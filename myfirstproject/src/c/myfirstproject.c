@@ -9,6 +9,8 @@ typedef struct {
   int32_t stride_unit;        // 0=cm, 1=in
   int32_t terrain_factor;     // hundredths
   int32_t grade_percent;      // tenths
+  int32_t sim_steps_enabled;  // 0/1
+  int32_t sim_steps_spm;      // steps/min
 } Settings;
 
 enum {
@@ -23,7 +25,9 @@ static const Settings SETTINGS_DEFAULTS = {
   .stride_value = 780,
   .stride_unit = 0,
   .terrain_factor = 100,
-  .grade_percent = 0
+  .grade_percent = 0,
+  .sim_steps_enabled = 1,
+  .sim_steps_spm = 122
 };
 
 static Window *s_window;
@@ -103,7 +107,9 @@ static void prv_update_display(void) {
   }
 
   int32_t steps = 0;
-  if (s_health_available) {
+  if (s_settings.sim_steps_enabled) {
+    steps = (int32_t)((elapsed_s * (int64_t)s_settings.sim_steps_spm) / 60);
+  } else if (s_health_available) {
     int32_t steps_total = (int32_t)health_service_sum(HealthMetricStepCount, s_day_start, now);
     steps = steps_total - s_steps_baseline;
     if (steps < 0) {
@@ -171,7 +177,9 @@ static void prv_update_display(void) {
     snprintf(pace_buf, sizeof(pace_buf), "Pace: --");
   }
 
-  if (s_health_available) {
+  if (s_settings.sim_steps_enabled) {
+    snprintf(steps_buf, sizeof(steps_buf), "Steps: %ld (sim)", (long)steps);
+  } else if (s_health_available) {
     snprintf(steps_buf, sizeof(steps_buf), "Steps: %ld", (long)steps);
   } else {
     snprintf(steps_buf, sizeof(steps_buf), "Steps: N/A");
@@ -228,6 +236,14 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   t = dict_find(iter, MESSAGE_KEY_grade_percent);
   if (t) {
     s_settings.grade_percent = t->value->int32;
+  }
+  t = dict_find(iter, MESSAGE_KEY_sim_steps_enabled);
+  if (t) {
+    s_settings.sim_steps_enabled = t->value->int32;
+  }
+  t = dict_find(iter, MESSAGE_KEY_sim_steps_spm);
+  if (t) {
+    s_settings.sim_steps_spm = t->value->int32;
   }
 
   prv_save_settings();

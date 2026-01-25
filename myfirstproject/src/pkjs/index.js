@@ -10,7 +10,9 @@
     stride_length_value: 780, // 78.0
     stride_length_unit: 0, // 0=cm, 1=in
     terrain_factor: 100, // 1.00
-    grade_percent: 0 // 0.0
+    grade_percent: 0, // 0.0
+    sim_steps_enabled: 0,
+    sim_steps_spm: 122
   };
 
   function loadSettings() {
@@ -59,6 +61,9 @@
       '<input type="number" id="terrain_factor" step="0.01">' +
       '<label>Grade (%)</label>' +
       '<input type="number" id="grade_percent" step="0.1">' +
+      '<label>Simulated steps (emulator)</label>' +
+      '<div class="row"><div><select id="sim_steps_enabled"><option value="0">Off</option><option value="1">On</option></select></div>' +
+      '<div><input type="number" id="sim_steps_spm" step="1"></div></div>' +
       '<button id="save">Save</button>' +
       '<script>' +
       'function $(id){return document.getElementById(id);}' +
@@ -71,6 +76,8 @@
       '$("stride_length_unit").value=s.stride_length_unit;' +
       '$("terrain_factor").value=(s.terrain_factor/100).toFixed(2);' +
       '$("grade_percent").value=(s.grade_percent/10).toFixed(1);' +
+      '$("sim_steps_enabled").value=s.sim_steps_enabled;' +
+      '$("sim_steps_spm").value=s.sim_steps_spm;' +
       'document.getElementById("save").addEventListener("click",function(){' +
       'var out={' +
       'weight_value: Math.round(parseFloat($("weight_value").value||0)*10),' +
@@ -80,7 +87,9 @@
       'stride_length_value: Math.round(parseFloat($("stride_length_value").value||0)*10),' +
       'stride_length_unit: parseInt($("stride_length_unit").value,10),' +
       'terrain_factor: Math.round(parseFloat($("terrain_factor").value||0)*100),' +
-      'grade_percent: Math.round(parseFloat($("grade_percent").value||0)*10)' +
+      'grade_percent: Math.round(parseFloat($("grade_percent").value||0)*10),' +
+      'sim_steps_enabled: parseInt($("sim_steps_enabled").value,10),' +
+      'sim_steps_spm: parseInt($("sim_steps_spm").value,10)' +
       '};' +
       'var payload=encodeURIComponent(JSON.stringify(out));' +
       'document.location="pebblejs://close#"+payload;' +
