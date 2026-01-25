@@ -36,6 +36,11 @@ static TextLayer *s_total_layer;
 static Settings s_settings;
 static time_t s_start_time;
 static bool s_health_available = false;
+static time_t s_day_start;
+static int32_t s_steps_baseline = 0;
+static int32_t s_last_steps = 0;
+static time_t s_last_time = 0;
+static int64_t s_speed_mmps = 0;
 
 static int64_t prv_weight_to_kg1000(int32_t value_tenths, int32_t unit) {
   if (unit == 1) {
@@ -99,12 +104,34 @@ static void prv_update_display(void) {
 
   int32_t steps = 0;
   if (s_health_available) {
-    steps = (int32_t)health_service_sum(HealthMetricStepCount, s_start_time, now);
+    int32_t steps_total = (int32_t)health_service_sum(HealthMetricStepCount, s_day_start, now);
+    steps = steps_total - s_steps_baseline;
+    if (steps < 0) {
+      steps = 0;
+    }
   }
 
   int64_t stride_mm = prv_stride_to_mm(s_settings.stride_value, s_settings.stride_unit);
   int64_t distance_mm = (int64_t)steps * stride_mm;
-  int64_t speed_mmps = distance_mm / elapsed_s;
+  if (s_last_time == 0) {
+    s_last_time = now;
+    s_last_steps = steps;
+  }
+  int64_t speed_mmps = s_speed_mmps;
+  int64_t delta_s = (int64_t)(now - s_last_time);
+  if (delta_s >= 5) {
+    int32_t delta_steps = steps - s_last_steps;
+    if (delta_steps < 0) {
+      delta_steps = 0;
+    }
+    speed_mmps = (int64_t)delta_steps * stride_mm / delta_s;
+    s_last_time = now;
+    s_last_steps = steps;
+    s_speed_mmps = speed_mmps;
+  }
+  if (speed_mmps > 5000) {
+    speed_mmps = 5000;
+  }
 
   bool use_imperial = (s_settings.weight_unit == 1);
   int64_t unit_mm = use_imperial ? 1609344 : 1000000;
@@ -254,9 +281,15 @@ static void prv_init(void) {
   });
 
   s_start_time = time(NULL);
+  struct tm *start_tm = localtime(&s_start_time);
+  start_tm->tm_hour = 0;
+  start_tm->tm_min = 0;
+  start_tm->tm_sec = 0;
+  s_day_start = mktime(start_tm);
   HealthServiceAccessibilityMask access = health_service_metric_accessible(HealthMetricStepCount, s_start_time, s_start_time);
   s_health_available = (access & HealthServiceAccessibilityMaskAvailable);
   if (s_health_available) {
+    s_steps_baseline = (int32_t)health_service_sum(HealthMetricStepCount, s_day_start, s_start_time);
     health_service_events_subscribe(prv_health_handler, NULL);
   }
 
