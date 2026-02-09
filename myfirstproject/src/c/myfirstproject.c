@@ -434,10 +434,10 @@ static void prv_window_load(Window *window) {
   prv_set_text_style(s_mid_right_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
   prv_set_text_style(s_bottom_left_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter, GColorWhite);
   prv_set_text_style(s_bottom_left_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
-  prv_set_text_style(s_bottom_left_secondary_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_bottom_left_secondary_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28), GTextAlignmentCenter, GColorWhite);
   prv_set_text_style(s_bottom_right_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter, GColorWhite);
   prv_set_text_style(s_bottom_right_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
-  prv_set_text_style(s_bottom_right_secondary_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_bottom_right_secondary_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28), GTextAlignmentCenter, GColorWhite);
 
   text_layer_set_overflow_mode(s_bottom_right_value_layer, GTextOverflowModeWordWrap);
   text_layer_set_overflow_mode(s_bottom_right_secondary_layer, GTextOverflowModeWordWrap);
