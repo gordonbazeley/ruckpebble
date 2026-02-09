@@ -40,18 +40,23 @@ static Layer *s_grid_layer;
 static TextLayer *s_top_time_layer;
 static TextLayer *s_top_left_layer;
 static TextLayer *s_top_right_layer;
-static Layer *s_mid_left_icon_layer;
+static BitmapLayer *s_mid_left_icon_layer;
 static TextLayer *s_mid_left_value_layer;
-static Layer *s_mid_center_icon_layer;
+static BitmapLayer *s_mid_center_icon_layer;
 static TextLayer *s_mid_center_value_layer;
-static Layer *s_mid_right_icon_layer;
+static BitmapLayer *s_mid_right_icon_layer;
 static TextLayer *s_mid_right_value_layer;
-static Layer *s_bottom_left_icon_layer;
+static BitmapLayer *s_bottom_left_icon_layer;
 static TextLayer *s_bottom_left_value_layer;
 static TextLayer *s_bottom_left_secondary_layer;
-static Layer *s_bottom_right_icon_layer;
+static BitmapLayer *s_bottom_right_icon_layer;
 static TextLayer *s_bottom_right_value_layer;
 static TextLayer *s_bottom_right_secondary_layer;
+static GBitmap *s_runner_icon;
+static GBitmap *s_heart_icon;
+static GBitmap *s_timer_icon;
+static GBitmap *s_steps_icon;
+static GBitmap *s_fire_icon;
 
 static Settings s_settings;
 static time_t s_start_time;
@@ -161,72 +166,6 @@ static void prv_set_text_style(TextLayer *layer, GFont font, GTextAlignment alig
   text_layer_set_text_color(layer, color);
   text_layer_set_font(layer, font);
   text_layer_set_text_alignment(layer, align);
-}
-
-static void prv_draw_runner_icon(Layer *layer, GContext *ctx) {
-  GRect b = layer_get_bounds(layer);
-  int cx = b.size.w / 2;
-  int cy = b.size.h / 2;
-  graphics_context_set_stroke_color(ctx, GColorWhite);
-  graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_circle(ctx, GPoint(cx, cy - 6), 2);
-  graphics_draw_line(ctx, GPoint(cx, cy - 3), GPoint(cx - 2, cy + 1));
-  graphics_draw_line(ctx, GPoint(cx - 2, cy + 1), GPoint(cx - 7, cy + 4));
-  graphics_draw_line(ctx, GPoint(cx - 2, cy + 1), GPoint(cx + 4, cy + 3));
-  graphics_draw_line(ctx, GPoint(cx - 1, cy - 1), GPoint(cx + 4, cy - 4));
-  graphics_draw_line(ctx, GPoint(cx + 4, cy - 4), GPoint(cx + 8, cy - 3));
-}
-
-static void prv_draw_heart_icon(Layer *layer, GContext *ctx) {
-  GRect b = layer_get_bounds(layer);
-  int cx = b.size.w / 2;
-  int cy = b.size.h / 2 + 1;
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_fill_circle(ctx, GPoint(cx - 3, cy - 2), 3);
-  graphics_fill_circle(ctx, GPoint(cx + 3, cy - 2), 3);
-  graphics_fill_rect(ctx, GRect(cx - 6, cy - 2, 12, 5), 0, GCornerNone);
-  graphics_draw_line(ctx, GPoint(cx - 6, cy + 1), GPoint(cx, cy + 8));
-  graphics_draw_line(ctx, GPoint(cx + 6, cy + 1), GPoint(cx, cy + 8));
-}
-
-static void prv_draw_stopwatch_icon(Layer *layer, GContext *ctx) {
-  GRect b = layer_get_bounds(layer);
-  int cx = b.size.w / 2;
-  int cy = b.size.h / 2 + 1;
-  graphics_context_set_stroke_color(ctx, GColorWhite);
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_circle(ctx, GPoint(cx, cy + 1), 6);
-  graphics_fill_rect(ctx, GRect(cx - 2, cy - 8, 4, 2), 0, GCornerNone);
-  graphics_draw_line(ctx, GPoint(cx + 4, cy - 6), GPoint(cx + 6, cy - 8));
-  graphics_draw_line(ctx, GPoint(cx, cy + 1), GPoint(cx, cy - 2));
-  graphics_draw_line(ctx, GPoint(cx, cy + 1), GPoint(cx + 3, cy + 3));
-}
-
-static void prv_draw_footsteps_icon(Layer *layer, GContext *ctx) {
-  GRect b = layer_get_bounds(layer);
-  int cx = b.size.w / 2;
-  int cy = b.size.h / 2 + 1;
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_fill_circle(ctx, GPoint(cx - 4, cy + 1), 3);
-  graphics_fill_circle(ctx, GPoint(cx - 6, cy - 3), 2);
-  graphics_fill_circle(ctx, GPoint(cx + 4, cy + 1), 3);
-  graphics_fill_circle(ctx, GPoint(cx + 2, cy - 3), 2);
-}
-
-static void prv_draw_fire_icon(Layer *layer, GContext *ctx) {
-  GRect b = layer_get_bounds(layer);
-  int cx = b.size.w / 2;
-  int cy = b.size.h / 2 + 1;
-  graphics_context_set_stroke_color(ctx, GColorWhite);
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_line(ctx, GPoint(cx, cy - 8), GPoint(cx - 5, cy - 1));
-  graphics_draw_line(ctx, GPoint(cx - 5, cy - 1), GPoint(cx - 3, cy + 6));
-  graphics_draw_line(ctx, GPoint(cx - 3, cy + 6), GPoint(cx + 3, cy + 6));
-  graphics_draw_line(ctx, GPoint(cx + 3, cy + 6), GPoint(cx + 5, cy - 1));
-  graphics_draw_line(ctx, GPoint(cx + 5, cy - 1), GPoint(cx, cy - 8));
-  graphics_fill_circle(ctx, GPoint(cx, cy + 1), 2);
 }
 
 static void prv_grid_layer_update_proc(Layer *layer, GContext *ctx) {
@@ -471,25 +410,35 @@ static void prv_window_load(Window *window) {
   s_top_left_layer = text_layer_create(GRect(8, 36, (w / 2) - 10, 28));
   s_top_right_layer = text_layer_create(GRect((w / 2) + 2, 36, (w / 2) - 10, 28));
 
-  s_mid_left_icon_layer = layer_create(GRect(28, 82, 20, 20));
+  s_mid_left_icon_layer = bitmap_layer_create(GRect(26, 80, 24, 24));
   s_mid_left_value_layer = text_layer_create(GRect(8, 100, 60, 36));
-  s_mid_center_icon_layer = layer_create(GRect((w / 2) - 10, 82, 20, 20));
+  s_mid_center_icon_layer = bitmap_layer_create(GRect((w / 2) - 12, 80, 24, 24));
   s_mid_center_value_layer = text_layer_create(GRect((w / 2) - 24, 102, 48, 30));
-  s_mid_right_icon_layer = layer_create(GRect(w - 48, 82, 20, 20));
+  s_mid_right_icon_layer = bitmap_layer_create(GRect(w - 50, 80, 24, 24));
   s_mid_right_value_layer = text_layer_create(GRect(w - 68, 100, 60, 36));
 
-  s_bottom_left_icon_layer = layer_create(GRect(40, 146, 20, 20));
+  s_bottom_left_icon_layer = bitmap_layer_create(GRect(38, 144, 24, 24));
   s_bottom_left_value_layer = text_layer_create(GRect(8, 162, (w / 2) - 12, 28));
   s_bottom_left_secondary_layer = text_layer_create(GRect(8, 188, (w / 2) - 12, 28));
-  s_bottom_right_icon_layer = layer_create(GRect((w / 2) + 36, 146, 20, 20));
+  s_bottom_right_icon_layer = bitmap_layer_create(GRect((w / 2) + 34, 144, 24, 24));
   s_bottom_right_value_layer = text_layer_create(GRect((w / 2) + 4, 162, (w / 2) - 12, 28));
   s_bottom_right_secondary_layer = text_layer_create(GRect((w / 2) + 4, 188, (w / 2) - 12, 28));
 
-  layer_set_update_proc(s_mid_left_icon_layer, prv_draw_runner_icon);
-  layer_set_update_proc(s_mid_center_icon_layer, prv_draw_heart_icon);
-  layer_set_update_proc(s_mid_right_icon_layer, prv_draw_stopwatch_icon);
-  layer_set_update_proc(s_bottom_left_icon_layer, prv_draw_footsteps_icon);
-  layer_set_update_proc(s_bottom_right_icon_layer, prv_draw_fire_icon);
+  s_runner_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_RUNNER);
+  s_heart_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_HEART);
+  s_timer_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_TIMER);
+  s_steps_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_STEPS);
+  s_fire_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_FIRE);
+  bitmap_layer_set_bitmap(s_mid_left_icon_layer, s_runner_icon);
+  bitmap_layer_set_bitmap(s_mid_center_icon_layer, s_heart_icon);
+  bitmap_layer_set_bitmap(s_mid_right_icon_layer, s_timer_icon);
+  bitmap_layer_set_bitmap(s_bottom_left_icon_layer, s_steps_icon);
+  bitmap_layer_set_bitmap(s_bottom_right_icon_layer, s_fire_icon);
+  bitmap_layer_set_background_color(s_mid_left_icon_layer, GColorClear);
+  bitmap_layer_set_background_color(s_mid_center_icon_layer, GColorClear);
+  bitmap_layer_set_background_color(s_mid_right_icon_layer, GColorClear);
+  bitmap_layer_set_background_color(s_bottom_left_icon_layer, GColorClear);
+  bitmap_layer_set_background_color(s_bottom_right_icon_layer, GColorClear);
 
   prv_set_text_style(s_top_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
   prv_set_text_style(s_top_left_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter, GColorWhite);
@@ -510,16 +459,16 @@ static void prv_window_load(Window *window) {
   layer_add_child(window_layer, text_layer_get_layer(s_top_time_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_top_left_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_top_right_layer));
-  layer_add_child(window_layer, s_mid_left_icon_layer);
+  layer_add_child(window_layer, bitmap_layer_get_layer(s_mid_left_icon_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_mid_left_value_layer));
-  layer_add_child(window_layer, s_mid_center_icon_layer);
+  layer_add_child(window_layer, bitmap_layer_get_layer(s_mid_center_icon_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_mid_center_value_layer));
-  layer_add_child(window_layer, s_mid_right_icon_layer);
+  layer_add_child(window_layer, bitmap_layer_get_layer(s_mid_right_icon_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_mid_right_value_layer));
-  layer_add_child(window_layer, s_bottom_left_icon_layer);
+  layer_add_child(window_layer, bitmap_layer_get_layer(s_bottom_left_icon_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_bottom_left_value_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_bottom_left_secondary_layer));
-  layer_add_child(window_layer, s_bottom_right_icon_layer);
+  layer_add_child(window_layer, bitmap_layer_get_layer(s_bottom_right_icon_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_bottom_right_value_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_bottom_right_secondary_layer));
 }
@@ -529,18 +478,23 @@ static void prv_window_unload(Window *window) {
   text_layer_destroy(s_top_time_layer);
   text_layer_destroy(s_top_left_layer);
   text_layer_destroy(s_top_right_layer);
-  layer_destroy(s_mid_left_icon_layer);
+  bitmap_layer_destroy(s_mid_left_icon_layer);
   text_layer_destroy(s_mid_left_value_layer);
-  layer_destroy(s_mid_center_icon_layer);
+  bitmap_layer_destroy(s_mid_center_icon_layer);
   text_layer_destroy(s_mid_center_value_layer);
-  layer_destroy(s_mid_right_icon_layer);
+  bitmap_layer_destroy(s_mid_right_icon_layer);
   text_layer_destroy(s_mid_right_value_layer);
-  layer_destroy(s_bottom_left_icon_layer);
+  bitmap_layer_destroy(s_bottom_left_icon_layer);
   text_layer_destroy(s_bottom_left_value_layer);
   text_layer_destroy(s_bottom_left_secondary_layer);
-  layer_destroy(s_bottom_right_icon_layer);
+  bitmap_layer_destroy(s_bottom_right_icon_layer);
   text_layer_destroy(s_bottom_right_value_layer);
   text_layer_destroy(s_bottom_right_secondary_layer);
+  gbitmap_destroy(s_runner_icon);
+  gbitmap_destroy(s_heart_icon);
+  gbitmap_destroy(s_timer_icon);
+  gbitmap_destroy(s_steps_icon);
+  gbitmap_destroy(s_fire_icon);
 }
 
 static void prv_init(void) {

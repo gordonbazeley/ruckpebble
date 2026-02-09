@@ -29,7 +29,33 @@
       "sim_steps_spm"
     ],
     "resources": {
-      "media": []
+      "media": [
+        {
+          "type": "png",
+          "name": "ICON_RUNNER",
+          "file": "resources/icons/directions_run.png"
+        },
+        {
+          "type": "png",
+          "name": "ICON_HEART",
+          "file": "resources/icons/favorite.png"
+        },
+        {
+          "type": "png",
+          "name": "ICON_TIMER",
+          "file": "resources/icons/timer.png"
+        },
+        {
+          "type": "png",
+          "name": "ICON_STEPS",
+          "file": "resources/icons/directions_walk.png"
+        },
+        {
+          "type": "png",
+          "name": "ICON_FIRE",
+          "file": "resources/icons/whatshot.png"
+        }
+      ]
     }
   }
 }
