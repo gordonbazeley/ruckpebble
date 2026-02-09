@@ -61,6 +61,8 @@ static int32_t s_last_steps = 0;
 static time_t s_last_time = 0;
 static int64_t s_speed_mmps = 0;
 
+#define EMULATOR_TIME_SCALE 10
+
 static int64_t prv_weight_to_kg1000(int32_t value_tenths, int32_t unit) {
   if (unit == 1) {
     return ((int64_t)value_tenths * 453592) / 10000;
@@ -195,9 +197,13 @@ static void prv_save_settings(void) {
 
 static void prv_update_display(void) {
   time_t now = time(NULL);
-  int64_t elapsed_s = (int64_t)(now - s_start_time);
-  if (elapsed_s < 1) {
-    elapsed_s = 1;
+  int64_t elapsed_real_s = (int64_t)(now - s_start_time);
+  if (elapsed_real_s < 1) {
+    elapsed_real_s = 1;
+  }
+  int64_t elapsed_s = elapsed_real_s;
+  if (s_settings.sim_steps_enabled) {
+    elapsed_s *= EMULATOR_TIME_SCALE;
   }
 
   int32_t steps = 0;
@@ -219,12 +225,16 @@ static void prv_update_display(void) {
   }
   int64_t speed_mmps = s_speed_mmps;
   int64_t delta_s = (int64_t)(now - s_last_time);
-  if (delta_s >= 5) {
+  int64_t delta_scaled_s = delta_s;
+  if (s_settings.sim_steps_enabled) {
+    delta_scaled_s *= EMULATOR_TIME_SCALE;
+  }
+  if (delta_scaled_s >= 5) {
     int32_t delta_steps = steps - s_last_steps;
     if (delta_steps < 0) {
       delta_steps = 0;
     }
-    speed_mmps = (int64_t)delta_steps * stride_mm / delta_s;
+    speed_mmps = (int64_t)delta_steps * stride_mm / delta_scaled_s;
     s_last_time = now;
     s_last_steps = steps;
     s_speed_mmps = speed_mmps;
