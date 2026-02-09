@@ -37,12 +37,20 @@ static const Settings SETTINGS_DEFAULTS = {
 };
 
 static Window *s_window;
-static TextLayer *s_distance_layer;
-static TextLayer *s_pace_layer;
-static TextLayer *s_steps_layer;
-static TextLayer *s_calories_layer;
-static TextLayer *s_total_layer;
-static TextLayer *s_debug_layer;
+static Layer *s_grid_layer;
+static TextLayer *s_top_time_layer;
+static TextLayer *s_top_left_layer;
+static TextLayer *s_top_right_layer;
+static TextLayer *s_mid_left_label_layer;
+static TextLayer *s_mid_left_value_layer;
+static TextLayer *s_mid_center_label_layer;
+static TextLayer *s_mid_center_value_layer;
+static TextLayer *s_mid_right_label_layer;
+static TextLayer *s_mid_right_value_layer;
+static TextLayer *s_bottom_left_label_layer;
+static TextLayer *s_bottom_left_value_layer;
+static TextLayer *s_bottom_right_label_layer;
+static TextLayer *s_bottom_right_value_layer;
 
 static Settings s_settings;
 static time_t s_start_time;
@@ -52,8 +60,6 @@ static int32_t s_steps_baseline = 0;
 static int32_t s_last_steps = 0;
 static time_t s_last_time = 0;
 static int64_t s_speed_mmps = 0;
-static int64_t s_last_mult_q = 0;
-static int64_t s_last_ratio_q = 0;
 
 static int64_t prv_weight_to_kg1000(int32_t value_tenths, int32_t unit) {
   if (unit == 1) {
@@ -99,7 +105,6 @@ static int64_t prv_pandolf_metabolic_mw(int64_t weight_kg1000, int64_t load_kg10
   }
   int64_t total = weight_kg1000 + load_kg1000;
   int64_t ratio_q = (load_kg1000 * 1000000) / weight_kg1000;
-  s_last_ratio_q = ratio_q;
   int64_t ratio_sq_q = (ratio_q * ratio_q) / 1000000;
   int64_t term1 = (weight_kg1000 * 3) / 2;
   int64_t term2 = (2 * total * ratio_sq_q) / 1000000;
@@ -125,9 +130,54 @@ static int64_t prv_pandolf_metabolic_mw(int64_t weight_kg1000, int64_t load_kg10
   int64_t mult_base_q = 1000000 + sqrt_term_q + vl_term_q;
   int64_t mult_q = (mult_base_q * 11) / 10;    // scale 1e6
   int64_t term3 = (term3_base * mult_q) / 1000000;
-  s_last_mult_q = mult_q;
+  (void)mult_q;
 
   return term1 + term2 + term3;
+}
+
+// ACSM walking estimate (no ruck adjustment): kcal/hour from bodyweight, speed, and grade.
+static int64_t prv_walking_kcal_per_hour(int64_t weight_kg1000, int64_t speed_mmps) {
+  // speed in m/min, Q1000
+  int64_t speed_m_min_q1000 = speed_mmps * 60;
+  int64_t grade_q1000 = s_settings.grade_percent; // tenths of percent maps to grade fraction * 1000
+
+  // VO2 in ml/kg/min, Q1000: 3.5 + 0.1*S + 1.8*S*G
+  int64_t vo2_q1000 = 3500;
+  vo2_q1000 += speed_m_min_q1000 / 10;
+  vo2_q1000 += (speed_m_min_q1000 * grade_q1000 * 1800) / 1000000;
+  if (vo2_q1000 < 0) {
+    vo2_q1000 = 0;
+  }
+
+  // kcal/h = VO2 * kg * 60 / 200
+  return (vo2_q1000 * weight_kg1000 * 3) / 10000000;
+}
+
+static void prv_set_text_style(TextLayer *layer, GFont font, GTextAlignment align) {
+  text_layer_set_background_color(layer, GColorBlack);
+  text_layer_set_text_color(layer, GColorWhite);
+  text_layer_set_font(layer, font);
+  text_layer_set_text_alignment(layer, align);
+}
+
+static void prv_set_label_text(TextLayer *layer, const char *text) {
+  text_layer_set_text(layer, text);
+}
+
+static void prv_grid_layer_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  int w = bounds.size.w;
+
+  int y_top = 34;
+  int y_mid = 84;
+  int y_bottom = 150;
+
+  graphics_context_set_stroke_color(ctx, GColorWhite);
+  graphics_draw_line(ctx, GPoint(8, y_top), GPoint(w - 8, y_top));
+  graphics_draw_line(ctx, GPoint(8, y_mid), GPoint(w - 8, y_mid));
+  graphics_draw_line(ctx, GPoint(8, y_bottom), GPoint(w - 8, y_bottom));
+  graphics_draw_line(ctx, GPoint(w / 2, y_top), GPoint(w / 2, y_mid));
+  graphics_draw_line(ctx, GPoint(w / 2, y_bottom), GPoint(w / 2, bounds.size.h - 36));
 }
 
 static void prv_load_settings(void) {
@@ -194,53 +244,68 @@ static void prv_update_display(void) {
   int64_t weight_kg1000 = prv_weight_to_kg1000(s_settings.weight_value, s_settings.weight_unit);
   int64_t load_kg1000 = prv_weight_to_kg1000(s_settings.ruck_weight_value, s_settings.ruck_weight_unit);
   int64_t metabolic_mw = prv_pandolf_metabolic_mw(weight_kg1000, load_kg1000, speed_mmps);
-  int64_t kcal_per_hour = (metabolic_mw * 3600) / 4184 / 1000;
-  int64_t kcal_total = (kcal_per_hour * elapsed_s) / 3600;
+  int64_t ruck_kcal_per_hour = (metabolic_mw * 3600) / 4184 / 1000;
+  int64_t ruck_kcal_total = (ruck_kcal_per_hour * elapsed_s) / 3600;
+  int64_t walk_kcal_per_hour = prv_walking_kcal_per_hour(weight_kg1000, speed_mmps);
+  int64_t walk_kcal_total = (walk_kcal_per_hour * elapsed_s) / 3600;
 
-  static char distance_buf[32];
-  static char pace_buf[32];
-  static char steps_buf[32];
-  static char cal_buf[32];
-  static char total_buf[32];
-  static char debug_buf[32];
+  static char top_time_buf[16];
+  static char top_left_buf[24];
+  static char top_right_buf[24];
+  static char pace_value_buf[16];
+  static char hr_value_buf[16];
+  static char timer_value_buf[16];
+  static char steps_value_buf[20];
+  static char calories_value_buf[24];
 
-  int64_t dist_int = distance_x100 / 100;
-  int64_t dist_frac = distance_x100 % 100;
-  if (dist_frac < 0) {
-    dist_frac = -dist_frac;
+  struct tm *now_tm = localtime(&now);
+  if (now_tm) {
+    strftime(top_time_buf, sizeof(top_time_buf), clock_is_24h_style() ? "%H:%M" : "%I:%M", now_tm);
+  } else {
+    snprintf(top_time_buf, sizeof(top_time_buf), "--:--");
   }
-  snprintf(distance_buf, sizeof(distance_buf), "Dist: %ld.%02ld %s",
-           (long)dist_int, (long)dist_frac, distance_unit_label);
+
   if (pace_sec > 0) {
     int pace_min = (int)(pace_sec / 60);
     int pace_rem = (int)(pace_sec % 60);
-    snprintf(pace_buf, sizeof(pace_buf), "Pace: %d:%02d /%s",
+    snprintf(top_left_buf, sizeof(top_left_buf), "%d:%02d/%s",
              pace_min, pace_rem, distance_unit_label);
+    snprintf(pace_value_buf, sizeof(pace_value_buf), "%d:%02d", pace_min, pace_rem);
   } else {
-    snprintf(pace_buf, sizeof(pace_buf), "Pace: --");
+    snprintf(top_left_buf, sizeof(top_left_buf), "--:--/%s", distance_unit_label);
+    snprintf(pace_value_buf, sizeof(pace_value_buf), "--:--");
   }
 
-  if (s_settings.sim_steps_enabled) {
-    snprintf(steps_buf, sizeof(steps_buf), "Steps: %ld (sim)", (long)steps);
-  } else if (s_health_available) {
-    snprintf(steps_buf, sizeof(steps_buf), "Steps: %ld", (long)steps);
-  } else {
-    snprintf(steps_buf, sizeof(steps_buf), "Steps: N/A");
-  }
-  snprintf(cal_buf, sizeof(cal_buf), "Cal/h: %ld", (long)kcal_per_hour);
-  snprintf(total_buf, sizeof(total_buf), "Total: %ld", (long)kcal_total);
-  snprintf(debug_buf, sizeof(debug_buf), "V:%ld.%03ld R:%ld M:%ld",
-           (long)(speed_mmps / 1000),
-           (long)(speed_mmps % 1000),
-           (long)(s_last_ratio_q / 1000),
-           (long)(s_last_mult_q / 1000));
+  snprintf(top_right_buf, sizeof(top_right_buf), "%ld.%02ld%s",
+           (long)(distance_x100 / 100),
+           (long)(distance_x100 % 100 < 0 ? -(distance_x100 % 100) : (distance_x100 % 100)),
+           distance_unit_label);
+  snprintf(timer_value_buf, sizeof(timer_value_buf), "%ld:%02ld",
+           (long)(elapsed_s / 60), (long)(elapsed_s % 60));
+  snprintf(steps_value_buf, sizeof(steps_value_buf), "%ld", (long)steps);
+  snprintf(calories_value_buf, sizeof(calories_value_buf), "W%ld\nR%ld",
+           (long)walk_kcal_total, (long)ruck_kcal_total);
 
-  text_layer_set_text(s_distance_layer, distance_buf);
-  text_layer_set_text(s_pace_layer, pace_buf);
-  text_layer_set_text(s_steps_layer, steps_buf);
-  text_layer_set_text(s_calories_layer, cal_buf);
-  text_layer_set_text(s_total_layer, total_buf);
-  text_layer_set_text(s_debug_layer, debug_buf);
+  if (health_service_metric_accessible(HealthMetricHeartRateBPM, now - 300, now)
+      & HealthServiceAccessibilityMaskAvailable) {
+    HealthValue heart_rate = health_service_peek_current_value(HealthMetricHeartRateBPM);
+    if (heart_rate > 0) {
+      snprintf(hr_value_buf, sizeof(hr_value_buf), "%ld", (long)heart_rate);
+    } else {
+      snprintf(hr_value_buf, sizeof(hr_value_buf), "--");
+    }
+  } else {
+    snprintf(hr_value_buf, sizeof(hr_value_buf), "--");
+  }
+
+  text_layer_set_text(s_top_time_layer, top_time_buf);
+  text_layer_set_text(s_top_left_layer, top_left_buf);
+  text_layer_set_text(s_top_right_layer, top_right_buf);
+  text_layer_set_text(s_mid_left_value_layer, pace_value_buf);
+  text_layer_set_text(s_mid_center_value_layer, hr_value_buf);
+  text_layer_set_text(s_mid_right_value_layer, timer_value_buf);
+  text_layer_set_text(s_bottom_left_value_layer, steps_value_buf);
+  text_layer_set_text(s_bottom_right_value_layer, calories_value_buf);
 }
 
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
@@ -302,43 +367,82 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
 static void prv_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
+  int w = bounds.size.w;
 
-  s_distance_layer = text_layer_create(GRect(4, 6, bounds.size.w - 8, 22));
-  s_pace_layer = text_layer_create(GRect(4, 28, bounds.size.w - 8, 22));
-  s_steps_layer = text_layer_create(GRect(4, 50, bounds.size.w - 8, 22));
-  s_calories_layer = text_layer_create(GRect(4, 72, bounds.size.w - 8, 22));
-  s_total_layer = text_layer_create(GRect(4, 94, bounds.size.w - 8, 22));
-  s_debug_layer = text_layer_create(GRect(4, 116, bounds.size.w - 8, 22));
+  s_grid_layer = layer_create(bounds);
+  layer_set_update_proc(s_grid_layer, prv_grid_layer_update_proc);
+  layer_add_child(window_layer, s_grid_layer);
 
-  text_layer_set_font(s_distance_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
-  text_layer_set_font(s_pace_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  text_layer_set_font(s_steps_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  text_layer_set_font(s_calories_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  text_layer_set_font(s_total_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
-  text_layer_set_font(s_debug_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+  s_top_time_layer = text_layer_create(GRect(0, 4, w, 30));
+  s_top_left_layer = text_layer_create(GRect(8, 37, (w / 2) - 10, 30));
+  s_top_right_layer = text_layer_create(GRect((w / 2) + 2, 37, (w / 2) - 10, 30));
 
-  text_layer_set_text_alignment(s_distance_layer, GTextAlignmentLeft);
-  text_layer_set_text_alignment(s_pace_layer, GTextAlignmentLeft);
-  text_layer_set_text_alignment(s_steps_layer, GTextAlignmentLeft);
-  text_layer_set_text_alignment(s_calories_layer, GTextAlignmentLeft);
-  text_layer_set_text_alignment(s_total_layer, GTextAlignmentLeft);
-  text_layer_set_text_alignment(s_debug_layer, GTextAlignmentLeft);
+  s_mid_left_label_layer = text_layer_create(GRect(8, 88, 56, 20));
+  s_mid_left_value_layer = text_layer_create(GRect(8, 106, 56, 34));
+  s_mid_center_label_layer = text_layer_create(GRect((w / 2) - 25, 88, 50, 20));
+  s_mid_center_value_layer = text_layer_create(GRect((w / 2) - 25, 106, 50, 34));
+  s_mid_right_label_layer = text_layer_create(GRect(w - 64, 88, 56, 20));
+  s_mid_right_value_layer = text_layer_create(GRect(w - 64, 106, 56, 34));
 
-  layer_add_child(window_layer, text_layer_get_layer(s_distance_layer));
-  layer_add_child(window_layer, text_layer_get_layer(s_pace_layer));
-  layer_add_child(window_layer, text_layer_get_layer(s_steps_layer));
-  layer_add_child(window_layer, text_layer_get_layer(s_calories_layer));
-  layer_add_child(window_layer, text_layer_get_layer(s_total_layer));
-  layer_add_child(window_layer, text_layer_get_layer(s_debug_layer));
+  s_bottom_left_label_layer = text_layer_create(GRect(8, 154, (w / 2) - 12, 20));
+  s_bottom_left_value_layer = text_layer_create(GRect(8, 171, (w / 2) - 12, 32));
+  s_bottom_right_label_layer = text_layer_create(GRect((w / 2) + 4, 154, (w / 2) - 12, 20));
+  s_bottom_right_value_layer = text_layer_create(GRect((w / 2) + 4, 171, (w / 2) - 12, 32));
+
+  prv_set_text_style(s_top_time_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK), GTextAlignmentCenter);
+  prv_set_text_style(s_top_left_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter);
+  prv_set_text_style(s_top_right_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter);
+  prv_set_text_style(s_mid_left_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter);
+  prv_set_text_style(s_mid_left_value_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK), GTextAlignmentCenter);
+  prv_set_text_style(s_mid_center_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter);
+  prv_set_text_style(s_mid_center_value_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK), GTextAlignmentCenter);
+  prv_set_text_style(s_mid_right_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter);
+  prv_set_text_style(s_mid_right_value_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK), GTextAlignmentCenter);
+  prv_set_text_style(s_bottom_left_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter);
+  prv_set_text_style(s_bottom_left_value_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK), GTextAlignmentCenter);
+  prv_set_text_style(s_bottom_right_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter);
+  prv_set_text_style(s_bottom_right_value_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK), GTextAlignmentCenter);
+
+  text_layer_set_overflow_mode(s_bottom_right_value_layer, GTextOverflowModeWordWrap);
+  text_layer_set_overflow_mode(s_top_left_layer, GTextOverflowModeWordWrap);
+  text_layer_set_overflow_mode(s_top_right_layer, GTextOverflowModeWordWrap);
+
+  prv_set_label_text(s_mid_left_label_layer, "PACE");
+  prv_set_label_text(s_mid_center_label_layer, "HR");
+  prv_set_label_text(s_mid_right_label_layer, "TIMER");
+  prv_set_label_text(s_bottom_left_label_layer, "STEPS");
+  prv_set_label_text(s_bottom_right_label_layer, "CAL");
+
+  layer_add_child(window_layer, text_layer_get_layer(s_top_time_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_top_left_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_top_right_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_mid_left_label_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_mid_left_value_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_mid_center_label_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_mid_center_value_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_mid_right_label_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_mid_right_value_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_bottom_left_label_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_bottom_left_value_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_bottom_right_label_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_bottom_right_value_layer));
 }
 
 static void prv_window_unload(Window *window) {
-  text_layer_destroy(s_distance_layer);
-  text_layer_destroy(s_pace_layer);
-  text_layer_destroy(s_steps_layer);
-  text_layer_destroy(s_calories_layer);
-  text_layer_destroy(s_total_layer);
-  text_layer_destroy(s_debug_layer);
+  layer_destroy(s_grid_layer);
+  text_layer_destroy(s_top_time_layer);
+  text_layer_destroy(s_top_left_layer);
+  text_layer_destroy(s_top_right_layer);
+  text_layer_destroy(s_mid_left_label_layer);
+  text_layer_destroy(s_mid_left_value_layer);
+  text_layer_destroy(s_mid_center_label_layer);
+  text_layer_destroy(s_mid_center_value_layer);
+  text_layer_destroy(s_mid_right_label_layer);
+  text_layer_destroy(s_mid_right_value_layer);
+  text_layer_destroy(s_bottom_left_label_layer);
+  text_layer_destroy(s_bottom_left_value_layer);
+  text_layer_destroy(s_bottom_right_label_layer);
+  text_layer_destroy(s_bottom_right_value_layer);
 }
 
 static void prv_init(void) {
