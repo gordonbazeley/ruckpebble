@@ -33,7 +33,6 @@ static const Settings SETTINGS_DEFAULTS = {
   .grade_percent = 0,
   .sim_steps_enabled = 1,
   .sim_steps_spm = 122
-  /* .sim_steps_spm = 488 */
 };
 
 static Window *s_window;
@@ -49,8 +48,10 @@ static TextLayer *s_mid_right_label_layer;
 static TextLayer *s_mid_right_value_layer;
 static TextLayer *s_bottom_left_label_layer;
 static TextLayer *s_bottom_left_value_layer;
+static TextLayer *s_bottom_left_secondary_layer;
 static TextLayer *s_bottom_right_label_layer;
 static TextLayer *s_bottom_right_value_layer;
+static TextLayer *s_bottom_right_secondary_layer;
 
 static Settings s_settings;
 static time_t s_start_time;
@@ -155,9 +156,9 @@ static int64_t prv_walking_kcal_per_hour(int64_t weight_kg1000, int64_t speed_mm
   return (vo2_q1000 * weight_kg1000 * 3) / 10000000;
 }
 
-static void prv_set_text_style(TextLayer *layer, GFont font, GTextAlignment align) {
+static void prv_set_text_style(TextLayer *layer, GFont font, GTextAlignment align, GColor color) {
   text_layer_set_background_color(layer, GColorClear);
-  text_layer_set_text_color(layer, GColorWhite);
+  text_layer_set_text_color(layer, color);
   text_layer_set_font(layer, font);
   text_layer_set_text_alignment(layer, align);
 }
@@ -207,11 +208,22 @@ static void prv_update_display(void) {
   }
 
   int32_t steps = 0;
+  int32_t steps_total_day = 0;
+  if (s_health_available) {
+    steps_total_day = (int32_t)health_service_sum(HealthMetricStepCount, s_day_start, now);
+    if (steps_total_day < 0) {
+      steps_total_day = 0;
+    }
+  }
   if (s_settings.sim_steps_enabled) {
     steps = (int32_t)((elapsed_s * (int64_t)s_settings.sim_steps_spm) / 60);
+    if (s_health_available) {
+      steps_total_day = s_steps_baseline + steps;
+    } else {
+      steps_total_day = steps;
+    }
   } else if (s_health_available) {
-    int32_t steps_total = (int32_t)health_service_sum(HealthMetricStepCount, s_day_start, now);
-    steps = steps_total - s_steps_baseline;
+    steps = steps_total_day - s_steps_baseline;
     if (steps < 0) {
       steps = 0;
     }
@@ -267,8 +279,10 @@ static void prv_update_display(void) {
   static char pace_value_buf[16];
   static char hr_value_buf[16];
   static char timer_value_buf[16];
-  static char steps_value_buf[20];
-  static char calories_value_buf[24];
+  static char steps_value_buf[16];
+  static char steps_total_value_buf[16];
+  static char calories_value_buf[16];
+  static char calories_walk_value_buf[16];
 
   struct tm *now_tm = localtime(&now);
   if (now_tm) {
@@ -295,8 +309,9 @@ static void prv_update_display(void) {
   snprintf(timer_value_buf, sizeof(timer_value_buf), "%ld:%02ld",
            (long)(elapsed_s / 60), (long)(elapsed_s % 60));
   snprintf(steps_value_buf, sizeof(steps_value_buf), "%ld", (long)steps);
-  snprintf(calories_value_buf, sizeof(calories_value_buf), "W%ld\nR%ld",
-           (long)walk_kcal_total, (long)ruck_kcal_total);
+  snprintf(steps_total_value_buf, sizeof(steps_total_value_buf), "%ld", (long)steps_total_day);
+  snprintf(calories_value_buf, sizeof(calories_value_buf), "%ld", (long)ruck_kcal_total);
+  snprintf(calories_walk_value_buf, sizeof(calories_walk_value_buf), "%ld", (long)walk_kcal_total);
 
   if (health_service_metric_accessible(HealthMetricHeartRateBPM, now - 300, now)
       & HealthServiceAccessibilityMaskAvailable) {
@@ -317,7 +332,9 @@ static void prv_update_display(void) {
   text_layer_set_text(s_mid_center_value_layer, hr_value_buf);
   text_layer_set_text(s_mid_right_value_layer, timer_value_buf);
   text_layer_set_text(s_bottom_left_value_layer, steps_value_buf);
+  text_layer_set_text(s_bottom_left_secondary_layer, steps_total_value_buf);
   text_layer_set_text(s_bottom_right_value_layer, calories_value_buf);
+  text_layer_set_text(s_bottom_right_secondary_layer, calories_walk_value_buf);
 }
 
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
@@ -400,25 +417,30 @@ static void prv_window_load(Window *window) {
   s_mid_right_value_layer = text_layer_create(GRect(w - 68, 100, 60, 36));
 
   s_bottom_left_label_layer = text_layer_create(GRect(8, 146, (w / 2) - 12, 20));
-  s_bottom_left_value_layer = text_layer_create(GRect(8, 164, (w / 2) - 12, 34));
+  s_bottom_left_value_layer = text_layer_create(GRect(8, 162, (w / 2) - 12, 28));
+  s_bottom_left_secondary_layer = text_layer_create(GRect(8, 188, (w / 2) - 12, 22));
   s_bottom_right_label_layer = text_layer_create(GRect((w / 2) + 4, 146, (w / 2) - 12, 20));
-  s_bottom_right_value_layer = text_layer_create(GRect((w / 2) + 4, 164, (w / 2) - 12, h - 164 - 6));
+  s_bottom_right_value_layer = text_layer_create(GRect((w / 2) + 4, 162, (w / 2) - 12, 28));
+  s_bottom_right_secondary_layer = text_layer_create(GRect((w / 2) + 4, 188, (w / 2) - 12, 22));
 
-  prv_set_text_style(s_top_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_top_left_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_top_right_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_mid_left_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_mid_left_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_mid_center_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_mid_center_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_mid_right_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_mid_right_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_bottom_left_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_bottom_left_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_bottom_right_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter);
-  prv_set_text_style(s_bottom_right_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter);
+  prv_set_text_style(s_top_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_top_left_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_top_right_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_mid_left_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_mid_left_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_mid_center_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_mid_center_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_mid_right_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_mid_right_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_bottom_left_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_bottom_left_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_bottom_left_secondary_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18), GTextAlignmentCenter, GColorLightGray);
+  prv_set_text_style(s_bottom_right_label_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_bottom_right_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_bottom_right_secondary_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18), GTextAlignmentCenter, GColorLightGray);
 
   text_layer_set_overflow_mode(s_bottom_right_value_layer, GTextOverflowModeWordWrap);
+  text_layer_set_overflow_mode(s_bottom_right_secondary_layer, GTextOverflowModeWordWrap);
   text_layer_set_overflow_mode(s_top_left_layer, GTextOverflowModeTrailingEllipsis);
   text_layer_set_overflow_mode(s_top_right_layer, GTextOverflowModeTrailingEllipsis);
 
@@ -439,8 +461,10 @@ static void prv_window_load(Window *window) {
   layer_add_child(window_layer, text_layer_get_layer(s_mid_right_value_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_bottom_left_label_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_bottom_left_value_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_bottom_left_secondary_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_bottom_right_label_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_bottom_right_value_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_bottom_right_secondary_layer));
 }
 
 static void prv_window_unload(Window *window) {
@@ -456,8 +480,10 @@ static void prv_window_unload(Window *window) {
   text_layer_destroy(s_mid_right_value_layer);
   text_layer_destroy(s_bottom_left_label_layer);
   text_layer_destroy(s_bottom_left_value_layer);
+  text_layer_destroy(s_bottom_left_secondary_layer);
   text_layer_destroy(s_bottom_right_label_layer);
   text_layer_destroy(s_bottom_right_value_layer);
+  text_layer_destroy(s_bottom_right_secondary_layer);
 }
 
 static void prv_init(void) {
