@@ -448,7 +448,7 @@ static void prv_window_load(Window *window) {
   prv_set_label_text(s_mid_center_label_layer, "HR");
   prv_set_label_text(s_mid_right_label_layer, "TIMER");
   prv_set_label_text(s_bottom_left_label_layer, "STEPS");
-  prv_set_label_text(s_bottom_right_label_layer, "CAL");
+  prv_set_label_text(s_bottom_right_label_layer, "CALORIES");
 
   layer_add_child(window_layer, text_layer_get_layer(s_top_time_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_top_left_layer));
