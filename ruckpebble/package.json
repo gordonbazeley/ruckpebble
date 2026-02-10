@@ -7,7 +7,7 @@
   "dependencies": {},
   "pebble": {
     "displayName": "ruckpebble",
-    "uuid": "00000000-0000-0000-0000-000000000001",
+    "uuid": "E078CE1C-3C93-459F-AA3C-B5390977C663",
     "sdkVersion": "3",
     "enableMultiJS": true,
     "targetPlatforms": [
