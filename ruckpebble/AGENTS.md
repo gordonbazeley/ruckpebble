@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `src/c/`: Pebble app source in C (entry point is `src/c/myfirstproject.c`).
+- `src/c/`: Pebble app source in C (entry point is `src/c/ruckpebble.c`).
 - `src/pkjs/` and `src/common/`: optional JavaScript companion code if added later (referenced by `wscript`).
 - `wscript`: Pebble SDK build rules and bundle configuration.
 - `package.json`: Pebble metadata (targets, UUID, resources).
@@ -14,7 +14,7 @@
 
 ## Coding Style & Naming Conventions
 - Language: C for watchapp logic; follow Pebble SDK APIs (`pebble.h`).
-- Indentation: 2 spaces, K&R-style braces as seen in `src/c/myfirstproject.c`.
+- Indentation: 2 spaces, K&R-style braces as seen in `src/c/ruckpebble.c`.
 - Naming: `s_` prefix for static globals, `prv_` prefix for internal functions.
 - Keep functions small and event-driven (handlers, load/unload, init/deinit).
 
