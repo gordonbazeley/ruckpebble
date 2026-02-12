@@ -1,21 +1,29 @@
 #include <pebble.h>
+#include <stdlib.h>
 
 #ifndef MESSAGE_KEY_sim_steps_enabled
 #define MESSAGE_KEY_sim_steps_enabled 8
 #define MESSAGE_KEY_sim_steps_spm 9
 #endif
 
+#define PROFILE_COUNT 3
+
+typedef struct {
+  int32_t ruck_weight_value;  // tenths
+  int32_t terrain_factor;     // hundredths
+  int32_t grade_percent;      // tenths
+} ProfileSettings;
+
 typedef struct {
   int32_t weight_value;       // tenths
   int32_t weight_unit;        // 0=kg, 1=lb
-  int32_t ruck_weight_value;  // tenths
   int32_t ruck_weight_unit;   // 0=kg, 1=lb
   int32_t stride_value;       // tenths
   int32_t stride_unit;        // 0=cm, 1=in
-  int32_t terrain_factor;     // hundredths
-  int32_t grade_percent;      // tenths
   int32_t sim_steps_enabled;  // 0/1
   int32_t sim_steps_spm;      // steps/min
+  int32_t active_profile;     // 0..PROFILE_COUNT-1
+  ProfileSettings profiles[PROFILE_COUNT];
 } Settings;
 
 enum {
@@ -25,16 +33,21 @@ enum {
 static const Settings SETTINGS_DEFAULTS = {
   .weight_value = 800,
   .weight_unit = 0,
-  .ruck_weight_value = 300,
-  .ruck_weight_unit = 1,
+  .ruck_weight_unit = 0,
   .stride_value = 780,
   .stride_unit = 0,
-  .terrain_factor = 100,
-  .grade_percent = 0,
   .sim_steps_enabled = 1,
-  .sim_steps_spm = 122
+  .sim_steps_spm = 122,
+  .active_profile = 0,
+  .profiles = {
+    { .ruck_weight_value = 136, .terrain_factor = 200, .grade_percent = 0 },
+    { .ruck_weight_value = 80, .terrain_factor = 100, .grade_percent = 0 },
+    { .ruck_weight_value = 120, .terrain_factor = 150, .grade_percent = 0 }
+  }
 };
 
+static Window *s_profile_window;
+static MenuLayer *s_profile_menu_layer;
 static Window *s_window;
 static Layer *s_grid_layer;
 static TextLayer *s_top_time_layer;
@@ -83,8 +96,19 @@ static int64_t prv_stride_to_mm(int32_t value_tenths, int32_t unit) {
   return (int64_t)value_tenths;
 }
 
+static int32_t prv_active_profile_index(void) {
+  if (s_settings.active_profile < 0 || s_settings.active_profile >= PROFILE_COUNT) {
+    return 0;
+  }
+  return s_settings.active_profile;
+}
+
+static ProfileSettings *prv_active_profile(void) {
+  return &s_settings.profiles[prv_active_profile_index()];
+}
+
 static int64_t prv_grade_q(void) {
-  return (int64_t)s_settings.grade_percent * 10;
+  return (int64_t)prv_active_profile()->grade_percent * 10;
 }
 
 static int64_t prv_isqrt(int64_t x) {
@@ -125,7 +149,7 @@ static int64_t prv_pandolf_metabolic_mw(int64_t weight_kg1000, int64_t load_kg10
   termB_q = (termB_q * 35) / 100;    // scale 1e7
   termB_q = termB_q / 10;            // scale 1e6
   int64_t inner_q = termA_q + termB_q;
-  int64_t mu_q = s_settings.terrain_factor; // scale 1e2
+  int64_t mu_q = prv_active_profile()->terrain_factor; // scale 1e2
   int64_t term3_base = (total * inner_q * mu_q) / (100 * 1000000);
 
   int64_t v2_03_q = (v2_q * 3) / 10;           // scale 1e6
@@ -147,7 +171,7 @@ static int64_t prv_pandolf_metabolic_mw(int64_t weight_kg1000, int64_t load_kg10
 static int64_t prv_walking_kcal_per_hour(int64_t weight_kg1000, int64_t speed_mmps) {
   // speed in m/min, Q1000
   int64_t speed_m_min_q1000 = speed_mmps * 60;
-  int64_t grade_q1000 = s_settings.grade_percent; // tenths of percent maps to grade fraction * 1000
+  int64_t grade_q1000 = prv_active_profile()->grade_percent; // tenths of percent maps to grade fraction * 1000
 
   // VO2 in ml/kg/min, Q1000: 3.5 + 0.1*S + 1.8*S*G
   int64_t vo2_q1000 = 3500;
@@ -198,6 +222,9 @@ static void prv_save_settings(void) {
 }
 
 static void prv_update_display(void) {
+  if (!s_top_time_layer) {
+    return;
+  }
   time_t now = time(NULL);
   int64_t elapsed_real_s = (int64_t)(now - s_start_time);
   if (elapsed_real_s < 1) {
@@ -266,8 +293,9 @@ static void prv_update_display(void) {
     pace_sec = (elapsed_s * unit_mm) / distance_mm;
   }
 
+  ProfileSettings *profile = prv_active_profile();
   int64_t weight_kg1000 = prv_weight_to_kg1000(s_settings.weight_value, s_settings.weight_unit);
-  int64_t load_kg1000 = prv_weight_to_kg1000(s_settings.ruck_weight_value, s_settings.ruck_weight_unit);
+  int64_t load_kg1000 = prv_weight_to_kg1000(profile->ruck_weight_value, s_settings.ruck_weight_unit);
   int64_t metabolic_mw = prv_pandolf_metabolic_mw(weight_kg1000, load_kg1000, speed_mmps);
   int64_t ruck_kcal_per_hour = (metabolic_mw * 3600) / 4184 / 1000;
   int64_t ruck_kcal_total = (ruck_kcal_per_hour * elapsed_s) / 3600;
@@ -357,10 +385,6 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   if (t) {
     s_settings.weight_unit = t->value->int32;
   }
-  t = dict_find(iter, MESSAGE_KEY_ruck_weight_value);
-  if (t) {
-    s_settings.ruck_weight_value = t->value->int32;
-  }
   t = dict_find(iter, MESSAGE_KEY_ruck_weight_unit);
   if (t) {
     s_settings.ruck_weight_unit = t->value->int32;
@@ -373,13 +397,41 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   if (t) {
     s_settings.stride_unit = t->value->int32;
   }
-  t = dict_find(iter, MESSAGE_KEY_terrain_factor);
+  t = dict_find(iter, MESSAGE_KEY_profile1_ruck_weight_value);
   if (t) {
-    s_settings.terrain_factor = t->value->int32;
+    s_settings.profiles[0].ruck_weight_value = t->value->int32;
   }
-  t = dict_find(iter, MESSAGE_KEY_grade_percent);
+  t = dict_find(iter, MESSAGE_KEY_profile1_terrain_factor);
   if (t) {
-    s_settings.grade_percent = t->value->int32;
+    s_settings.profiles[0].terrain_factor = t->value->int32;
+  }
+  t = dict_find(iter, MESSAGE_KEY_profile1_grade_percent);
+  if (t) {
+    s_settings.profiles[0].grade_percent = t->value->int32;
+  }
+  t = dict_find(iter, MESSAGE_KEY_profile2_ruck_weight_value);
+  if (t) {
+    s_settings.profiles[1].ruck_weight_value = t->value->int32;
+  }
+  t = dict_find(iter, MESSAGE_KEY_profile2_terrain_factor);
+  if (t) {
+    s_settings.profiles[1].terrain_factor = t->value->int32;
+  }
+  t = dict_find(iter, MESSAGE_KEY_profile2_grade_percent);
+  if (t) {
+    s_settings.profiles[1].grade_percent = t->value->int32;
+  }
+  t = dict_find(iter, MESSAGE_KEY_profile3_ruck_weight_value);
+  if (t) {
+    s_settings.profiles[2].ruck_weight_value = t->value->int32;
+  }
+  t = dict_find(iter, MESSAGE_KEY_profile3_terrain_factor);
+  if (t) {
+    s_settings.profiles[2].terrain_factor = t->value->int32;
+  }
+  t = dict_find(iter, MESSAGE_KEY_profile3_grade_percent);
+  if (t) {
+    s_settings.profiles[2].grade_percent = t->value->int32;
   }
   t = dict_find(iter, MESSAGE_KEY_sim_steps_enabled);
   if (t) {
@@ -391,7 +443,86 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   }
 
   prv_save_settings();
+  if (s_profile_menu_layer) {
+    menu_layer_reload_data(s_profile_menu_layer);
+  }
   prv_update_display();
+}
+
+static void prv_start_session(void) {
+  s_start_time = time(NULL);
+  s_last_time = 0;
+  s_last_steps = 0;
+  s_speed_mmps = 0;
+  if (s_health_available) {
+    s_steps_baseline = (int32_t)health_service_sum(HealthMetricStepCount, s_day_start, s_start_time);
+  } else {
+    s_steps_baseline = 0;
+  }
+}
+
+static uint16_t prv_profile_get_num_rows_callback(MenuLayer *menu_layer, uint16_t section_index, void *context) {
+  (void)menu_layer;
+  (void)section_index;
+  (void)context;
+  return PROFILE_COUNT;
+}
+
+static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *context) {
+  (void)context;
+  int row = cell_index->row;
+  if (row < 0 || row >= PROFILE_COUNT) {
+    return;
+  }
+  ProfileSettings *p = &s_settings.profiles[row];
+  static char subtitle[40];
+  static char title[16];
+  const char *unit = s_settings.ruck_weight_unit == 1 ? "lb" : "kg";
+  snprintf(title, sizeof(title), "Profile %d", row + 1);
+  snprintf(subtitle, sizeof(subtitle), "%ld.%ld%s  mu %ld.%02ld  g %ld.%ld%%",
+           (long)(p->ruck_weight_value / 10),
+           (long)labs(p->ruck_weight_value % 10),
+           unit,
+           (long)(p->terrain_factor / 100),
+           (long)labs(p->terrain_factor % 100),
+           (long)(p->grade_percent / 10),
+           (long)labs(p->grade_percent % 10));
+  menu_cell_basic_draw(ctx, cell_layer, title, subtitle, NULL);
+}
+
+static void prv_profile_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *context) {
+  (void)menu_layer;
+  (void)context;
+  if (cell_index->row < 0 || cell_index->row >= PROFILE_COUNT) {
+    return;
+  }
+  s_settings.active_profile = cell_index->row;
+  prv_save_settings();
+  prv_start_session();
+  window_stack_push(s_window, true);
+  window_stack_remove(s_profile_window, true);
+  prv_update_display();
+}
+
+static void prv_profile_window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+  s_profile_menu_layer = menu_layer_create(bounds);
+  menu_layer_set_click_config_onto_window(s_profile_menu_layer, window);
+  menu_layer_set_callbacks(s_profile_menu_layer, NULL, (MenuLayerCallbacks) {
+    .get_num_rows = prv_profile_get_num_rows_callback,
+    .draw_row = prv_profile_draw_row_callback,
+    .select_click = prv_profile_select_callback,
+  });
+  menu_layer_set_selected_index(s_profile_menu_layer, (MenuIndex) { .section = 0, .row = prv_active_profile_index() },
+                                MenuRowAlignCenter, false);
+  layer_add_child(window_layer, menu_layer_get_layer(s_profile_menu_layer));
+}
+
+static void prv_profile_window_unload(Window *window) {
+  (void)window;
+  menu_layer_destroy(s_profile_menu_layer);
+  s_profile_menu_layer = NULL;
 }
 
 static void prv_window_load(Window *window) {
@@ -506,16 +637,26 @@ static void prv_init(void) {
     .unload = prv_window_unload,
   });
 
-  s_start_time = time(NULL);
-  struct tm *start_tm = localtime(&s_start_time);
-  start_tm->tm_hour = 0;
-  start_tm->tm_min = 0;
-  start_tm->tm_sec = 0;
-  s_day_start = mktime(start_tm);
-  HealthServiceAccessibilityMask access = health_service_metric_accessible(HealthMetricStepCount, s_start_time, s_start_time);
+  s_profile_window = window_create();
+  window_set_window_handlers(s_profile_window, (WindowHandlers) {
+    .load = prv_profile_window_load,
+    .unload = prv_profile_window_unload,
+  });
+
+  time_t now = time(NULL);
+  s_start_time = now;
+  struct tm *start_tm = localtime(&now);
+  if (start_tm) {
+    start_tm->tm_hour = 0;
+    start_tm->tm_min = 0;
+    start_tm->tm_sec = 0;
+    s_day_start = mktime(start_tm);
+  } else {
+    s_day_start = now;
+  }
+  HealthServiceAccessibilityMask access = health_service_metric_accessible(HealthMetricStepCount, now, now);
   s_health_available = (access & HealthServiceAccessibilityMaskAvailable);
   if (s_health_available) {
-    s_steps_baseline = (int32_t)health_service_sum(HealthMetricStepCount, s_day_start, s_start_time);
     health_service_events_subscribe(prv_health_handler, NULL);
   }
 
@@ -524,8 +665,7 @@ static void prv_init(void) {
   app_message_register_inbox_received(prv_inbox_received_handler);
   app_message_open(256, 64);
 
-  window_stack_push(s_window, true);
-  prv_update_display();
+  window_stack_push(s_profile_window, true);
 }
 
 static void prv_deinit(void) {
@@ -533,6 +673,7 @@ static void prv_deinit(void) {
   if (s_health_available) {
     health_service_events_unsubscribe();
   }
+  window_destroy(s_profile_window);
   window_destroy(s_window);
 }
 
