@@ -470,8 +470,8 @@ static uint16_t prv_profile_get_num_rows_callback(MenuLayer *menu_layer, uint16_
 
 static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *context) {
   (void)context;
-  int row = cell_index->row;
-  if (row < 0 || row >= PROFILE_COUNT) {
+  int row = (int)cell_index->row;
+  if (row >= PROFILE_COUNT) {
     return;
   }
   ProfileSettings *p = &s_settings.profiles[row];
@@ -493,7 +493,7 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
 static void prv_profile_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *context) {
   (void)menu_layer;
   (void)context;
-  if (cell_index->row < 0 || cell_index->row >= PROFILE_COUNT) {
+  if (cell_index->row >= PROFILE_COUNT) {
     return;
   }
   s_settings.active_profile = cell_index->row;
@@ -529,7 +529,6 @@ static void prv_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
   int w = bounds.size.w;
-  int h = bounds.size.h;
 
   window_set_background_color(window, GColorBlack);
 
