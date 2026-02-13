@@ -8,7 +8,7 @@
 #endif
 
 #define PROFILE_COUNT 3
-#define PROFILE_NAME_MAX_LEN 21
+#define PROFILE_NAME_MAX_LEN 33
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -46,6 +46,11 @@ static const Settings SETTINGS_DEFAULTS = {
     { .ruck_weight_value = 136, .terrain_factor = 200, .grade_percent = 0 },
     { .ruck_weight_value = 80, .terrain_factor = 100, .grade_percent = 0 },
     { .ruck_weight_value = 120, .terrain_factor = 150, .grade_percent = 0 }
+  },
+  .profile_names = {
+    "Two Mabels, offroad",
+    "One Mabel, roads and tracks",
+    ""
   }
 };
 
@@ -499,10 +504,10 @@ static uint16_t prv_profile_get_num_rows_callback(MenuLayer *menu_layer, uint16_
 }
 
 static int16_t prv_profile_get_cell_height_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *context) {
-  (void)menu_layer;
   (void)cell_index;
   (void)context;
-  return 44;
+  GRect bounds = layer_get_bounds(menu_layer_get_layer(menu_layer));
+  return bounds.size.h / PROFILE_COUNT;
 }
 
 static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *context) {
@@ -518,11 +523,17 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   static char grade_value[8];
   const char *title_text = legacy_title;
   const int16_t y = 0;
-  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
-  GCompOp icon_comp = menu_cell_layer_is_highlighted(cell_layer) ? GCompOpAssignInverted : GCompOpSet;
+  const int16_t row_h = layer_get_bounds((Layer *)cell_layer).size.h;
+  const int16_t value_y = row_h - 24;
+  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+  GCompOp icon_comp = GCompOpSet;
 
   if (s_settings.profile_names[row][0] != '\0') {
     title_text = s_settings.profile_names[row];
+  } else if (row == 0) {
+    title_text = "Two Mabels, offroad";
+  } else if (row == 1) {
+    title_text = "One Mabel, roads and tracks";
   } else {
     snprintf(legacy_title, sizeof(legacy_title), "Profile %d", row + 1);
     title_text = legacy_title;
@@ -538,19 +549,19 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
 
   graphics_context_set_compositing_mode(ctx, icon_comp);
   if (s_profile_weight_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(2, y + 22, 12, 12));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(4, y + value_y + 4, 12, 12));
   }
   if (s_profile_terrain_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(50, y + 22, 12, 12));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(52, y + value_y + 4, 12, 12));
   }
   if (s_profile_grade_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(98, y + 22, 12, 12));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(100, y + value_y + 4, 12, 12));
   }
-  graphics_draw_text(ctx, weight_value, value_font, GRect(16, y + 20, 32, 16),
+  graphics_draw_text(ctx, weight_value, value_font, GRect(18, y + value_y, 32, 24),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, terrain_value, value_font, GRect(64, y + 20, 32, 16),
+  graphics_draw_text(ctx, terrain_value, value_font, GRect(66, y + value_y, 32, 24),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, grade_value, value_font, GRect(112, y + 20, 32, 16),
+  graphics_draw_text(ctx, grade_value, value_font, GRect(114, y + value_y, 30, 24),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 }
 
@@ -578,6 +589,8 @@ static void prv_profile_window_load(Window *window) {
     .draw_row = prv_profile_draw_row_callback,
     .select_click = prv_profile_select_callback,
   });
+  menu_layer_set_normal_colors(s_profile_menu_layer, GColorBlack, GColorWhite);
+  menu_layer_set_highlight_colors(s_profile_menu_layer, GColorBlack, GColorWhite);
   s_profile_weight_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_WEIGHT);
   s_profile_terrain_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_TERRAIN);
   s_profile_grade_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_GRADE);

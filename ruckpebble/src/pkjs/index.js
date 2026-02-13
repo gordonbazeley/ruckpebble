@@ -12,12 +12,12 @@
     profile1_ruck_weight_value: 136,
     profile1_terrain_factor: 200,
     profile1_grade_percent: 0,
-    profile1_name: '',
+    profile1_name: 'Two Mabels, offroad',
 
     profile2_ruck_weight_value: 80,
     profile2_terrain_factor: 100,
     profile2_grade_percent: 0,
-    profile2_name: '',
+    profile2_name: 'One Mabel, roads and tracks',
 
     profile3_ruck_weight_value: 120,
     profile3_terrain_factor: 150,
@@ -73,21 +73,21 @@
       '</div>' +
 
       '<div class="card"><h2>Profile 1</h2>' +
-      '<label>Profile name (optional)</label><input type="text" id="p1_name" maxlength="20">' +
+      '<label>Profile name (optional)</label><input type="text" id="p1_name" maxlength="32">' +
       '<label>Ruck weight</label><input type="number" id="p1_ruck_weight_value" step="0.1">' +
       '<label>Terrain factor (μ)</label><input type="number" id="p1_terrain_factor" step="0.01">' +
       '<label>Grade (%)</label><input type="number" id="p1_grade_percent" step="0.1">' +
       '</div>' +
 
       '<div class="card"><h2>Profile 2</h2>' +
-      '<label>Profile name (optional)</label><input type="text" id="p2_name" maxlength="20">' +
+      '<label>Profile name (optional)</label><input type="text" id="p2_name" maxlength="32">' +
       '<label>Ruck weight</label><input type="number" id="p2_ruck_weight_value" step="0.1">' +
       '<label>Terrain factor (μ)</label><input type="number" id="p2_terrain_factor" step="0.01">' +
       '<label>Grade (%)</label><input type="number" id="p2_grade_percent" step="0.1">' +
       '</div>' +
 
       '<div class="card"><h2>Profile 3</h2>' +
-      '<label>Profile name (optional)</label><input type="text" id="p3_name" maxlength="20">' +
+      '<label>Profile name (optional)</label><input type="text" id="p3_name" maxlength="32">' +
       '<label>Ruck weight</label><input type="number" id="p3_ruck_weight_value" step="0.1">' +
       '<label>Terrain factor (μ)</label><input type="number" id="p3_terrain_factor" step="0.01">' +
       '<label>Grade (%)</label><input type="number" id="p3_grade_percent" step="0.1">' +
@@ -138,17 +138,17 @@
       'profile1_ruck_weight_value: Math.round(parseFloat($("p1_ruck_weight_value").value||0)*10),' +
       'profile1_terrain_factor: Math.round(parseFloat($("p1_terrain_factor").value||0)*100),' +
       'profile1_grade_percent: Math.round(parseFloat($("p1_grade_percent").value||0)*10),' +
-      'profile1_name: ($("p1_name").value||"").trim().slice(0,20),' +
+      'profile1_name: ($("p1_name").value||"").trim().slice(0,32),' +
 
       'profile2_ruck_weight_value: Math.round(parseFloat($("p2_ruck_weight_value").value||0)*10),' +
       'profile2_terrain_factor: Math.round(parseFloat($("p2_terrain_factor").value||0)*100),' +
       'profile2_grade_percent: Math.round(parseFloat($("p2_grade_percent").value||0)*10),' +
-      'profile2_name: ($("p2_name").value||"").trim().slice(0,20),' +
+      'profile2_name: ($("p2_name").value||"").trim().slice(0,32),' +
 
       'profile3_ruck_weight_value: Math.round(parseFloat($("p3_ruck_weight_value").value||0)*10),' +
       'profile3_terrain_factor: Math.round(parseFloat($("p3_terrain_factor").value||0)*100),' +
       'profile3_grade_percent: Math.round(parseFloat($("p3_grade_percent").value||0)*10),' +
-      'profile3_name: ($("p3_name").value||"").trim().slice(0,20),' +
+      'profile3_name: ($("p3_name").value||"").trim().slice(0,32),' +
 
       'sim_steps_enabled: parseInt($("sim_steps_enabled").value,10),' +
       'sim_steps_spm: parseInt($("sim_steps_spm").value,10)' +
