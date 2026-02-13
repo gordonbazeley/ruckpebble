@@ -524,9 +524,9 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   const char *title_text = legacy_title;
   const int16_t y = 0;
   const int16_t row_h = layer_get_bounds((Layer *)cell_layer).size.h;
-  const int16_t value_y = row_h - 24;
-  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
-  GCompOp icon_comp = GCompOpSet;
+  const int16_t value_y = row_h - 30;
+  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
+  GCompOp icon_comp = menu_cell_layer_is_highlighted(cell_layer) ? GCompOpSet : GCompOpAssignInverted;
 
   if (s_settings.profile_names[row][0] != '\0') {
     title_text = s_settings.profile_names[row];
@@ -549,19 +549,19 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
 
   graphics_context_set_compositing_mode(ctx, icon_comp);
   if (s_profile_weight_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(4, y + value_y + 4, 12, 12));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(2, y + value_y + 4, 18, 18));
   }
   if (s_profile_terrain_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(52, y + value_y + 4, 12, 12));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(50, y + value_y + 4, 18, 18));
   }
   if (s_profile_grade_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(100, y + value_y + 4, 12, 12));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(98, y + value_y + 4, 18, 18));
   }
-  graphics_draw_text(ctx, weight_value, value_font, GRect(18, y + value_y, 32, 24),
+  graphics_draw_text(ctx, weight_value, value_font, GRect(20, y + value_y, 30, 28),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, terrain_value, value_font, GRect(66, y + value_y, 32, 24),
+  graphics_draw_text(ctx, terrain_value, value_font, GRect(68, y + value_y, 30, 28),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, grade_value, value_font, GRect(114, y + value_y, 30, 24),
+  graphics_draw_text(ctx, grade_value, value_font, GRect(116, y + value_y, 28, 28),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 }
 
