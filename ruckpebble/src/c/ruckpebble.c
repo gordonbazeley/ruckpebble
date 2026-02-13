@@ -527,8 +527,8 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   GRect bounds = layer_get_bounds((Layer *)cell_layer);
   const int16_t row_w = bounds.size.w;
   const int16_t row_h = bounds.size.h;
-  const int16_t value_y = row_h - 32;
-  const int16_t icon_size = 29;
+  const int16_t value_y = row_h - 34;
+  const int16_t icon_size = 30;
   const int16_t weight_col_w = (row_w * 42) / 100;
   const int16_t terrain_col_w = (row_w - weight_col_w) / 2;
   const int16_t grade_col_x = weight_col_w + terrain_col_w;
@@ -555,6 +555,10 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
 
   graphics_context_set_fill_color(ctx, bg);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  if (row > 0) {
+    graphics_context_set_stroke_color(ctx, GColorDarkGray);
+    graphics_draw_line(ctx, GPoint(0, 0), GPoint(row_w - 1, 0));
+  }
   graphics_context_set_text_color(ctx, GColorWhite);
   graphics_draw_text(ctx, title_text, title_font, GRect(0, y + 2, row_w, 24),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
@@ -575,10 +579,6 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
   graphics_draw_text(ctx, grade_value, value_font, GRect(grade_col_x + icon_size + 2, y + value_y + 5, row_w - (grade_col_x + icon_size + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  if (row < PROFILE_COUNT - 1) {
-    graphics_context_set_stroke_color(ctx, GColorDarkGray);
-    graphics_draw_line(ctx, GPoint(0, row_h - 1), GPoint(row_w - 1, row_h - 1));
-  }
 }
 
 static void prv_profile_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *context) {
