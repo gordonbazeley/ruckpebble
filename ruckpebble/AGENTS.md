@@ -1,4 +1,7 @@
 # Repository Guidelines
+* There are two screens to the app
+  * Profile - this is the first screen which shows when the app starts where you select Profile
+  * Ruck - this is the running ruck screen which shows when you select a profile
 
 ## Project Structure & Module Organization
 - `src/c/`: Pebble app source in C (entry point is `src/c/ruckpebble.c`).
@@ -12,6 +15,23 @@ You have my permissions to always run commands that start with pebble
 - `pebble install --emulator <platform>`: Build and install to an emulator (e.g., `basalt`).
 - `pebble clean`: Remove `build/` artifacts.
 - `pebble logs`: Stream device/emulator logs for runtime debugging.
+- After every successful `pebble build`, always run `pebble install --emulator emery`.
+
+## Approved Command Prefixes
+- `pebble build`
+- `pebble install --emulator emery`
+- `pebble screenshot /tmp/emu_check.png`
+- `pebble screenshot /tmp/emu_now.png`
+- `pebble screenshot /tmp/emu_profile_now.png`
+- `pebble screenshot /tmp/emu_after_fix.png`
+- `pebble screenshot /tmp/emu_secondline_restored.png`
+- `pebble emu-button back`
+- `pebble emu-button click back`
+- `pebble emu-button click select`
+- `git -C /Users/gordonbazeley/src/ruckpebble commit`
+- `git -C /Users/gordonbazeley/src/ruckpebble push origin main`
+- `open -a Pebble`
+- `osascript -e 'tell application "System Events" to set frontmost of (first process whose unix id is 43798) to true'`
 
 ## Coding Style & Naming Conventions
 - Language: C for watchapp logic; follow Pebble SDK APIs (`pebble.h`).
@@ -19,12 +39,17 @@ You have my permissions to always run commands that start with pebble
 - Naming: `s_` prefix for static globals, `prv_` prefix for internal functions.
 - Keep functions small and event-driven (handlers, load/unload, init/deinit).
 
+
 ## Testing Guidelines
 - No automated test framework is configured in this repository.
 - Validate behavior by running in the emulator and checking `pebble logs`.
 - If you add tests, document the runner and required commands here.
 
-## Commit & Pull Request Guidelines
+## Git
+* If I ask you to "commit and push" or "cp" then do the following (without requesting permission)
+  * Stage all changed files
+  * Add a useful commit message
+  * git push origin
 - Git history only shows “Initial …” commits; no formal convention established.
 - Use short, imperative summaries (e.g., “Add button handlers”).
 - PRs should include a clear description, affected platforms, and emulator screenshots for UI changes.

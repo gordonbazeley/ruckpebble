@@ -9,6 +9,7 @@
 
 #define PROFILE_COUNT 3
 #define PROFILE_NAME_MAX_LEN 33
+#define SCREEN_PADDING 5
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -56,11 +57,14 @@ static const Settings SETTINGS_DEFAULTS = {
 
 static Window *s_profile_window;
 static MenuLayer *s_profile_menu_layer;
+static Window *s_music_window;
+static MenuLayer *s_music_menu_layer;
 static Window *s_window;
 static Layer *s_grid_layer;
 static TextLayer *s_top_time_layer;
 static TextLayer *s_top_left_layer;
 static TextLayer *s_top_right_layer;
+static TextLayer *s_top_stats_right_layer;
 static BitmapLayer *s_mid_left_icon_layer;
 static TextLayer *s_mid_left_value_layer;
 static BitmapLayer *s_mid_center_icon_layer;
@@ -134,6 +138,20 @@ static const char *prv_terrain_label(int32_t terrain_factor_hundredths) {
     return "Mixed";
   }
   return "Hilly";
+}
+
+static const char *prv_profile_display_name(int32_t row, char *fallback, size_t fallback_size) {
+  if (row >= 0 && row < PROFILE_COUNT && s_settings.profile_names[row][0] != '\0') {
+    return s_settings.profile_names[row];
+  }
+  if (row == 0) {
+    return "Two Mabels, offroad";
+  }
+  if (row == 1) {
+    return "One Mabel, roads and tracks";
+  }
+  snprintf(fallback, fallback_size, "Profile %ld", (long)(row + 1));
+  return fallback;
 }
 
 static ProfileSettings *prv_active_profile(void) {
@@ -230,17 +248,15 @@ static void prv_grid_layer_update_proc(Layer *layer, GContext *ctx) {
   int w = bounds.size.w;
   int h = bounds.size.h;
 
-  int y_top = 32;
-  int y_mid = 76;
+  int y_top = 56;
   int y_bottom = 142;
 
   graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_context_set_stroke_width(ctx, 1);
   graphics_draw_line(ctx, GPoint(8, y_top), GPoint(w - 8, y_top));
-  graphics_draw_line(ctx, GPoint(8, y_mid), GPoint(w - 8, y_mid));
   graphics_draw_line(ctx, GPoint(8, y_bottom), GPoint(w - 8, y_bottom));
-  graphics_draw_line(ctx, GPoint(w / 2, y_top), GPoint(w / 2, y_mid));
-  graphics_draw_line(ctx, GPoint(w / 2, y_bottom), GPoint(w / 2, h - 38));
+  graphics_draw_line(ctx, GPoint(w / 2, 30), GPoint(w / 2, y_top));
+  graphics_draw_line(ctx, GPoint(w / 2, y_bottom), GPoint(w / 2, h - 1));
 }
 
 static void prv_load_settings(void) {
@@ -336,8 +352,9 @@ static void prv_update_display(void) {
   int64_t walk_kcal_total = (walk_kcal_per_hour * elapsed_s) / 3600;
 
   static char top_time_buf[16];
-  static char top_left_buf[24];
-  static char top_right_buf[24];
+  static char distance_buf[16];
+  static char profile_name_buf[24];
+  static char pace_header_buf[16];
   static char pace_value_buf[16];
   static char hr_value_buf[16];
   static char timer_value_buf[16];
@@ -346,28 +363,24 @@ static void prv_update_display(void) {
   static char calories_value_buf[16];
   static char calories_walk_value_buf[16];
 
+  const char *profile_name = prv_profile_display_name(prv_active_profile_index(), profile_name_buf, sizeof(profile_name_buf));
   struct tm *now_tm = localtime(&now);
   if (now_tm) {
     strftime(top_time_buf, sizeof(top_time_buf), clock_is_24h_style() ? "%H:%M" : "%I:%M", now_tm);
   } else {
     snprintf(top_time_buf, sizeof(top_time_buf), "--:--");
   }
-
   if (pace_sec > 0) {
     int pace_min = (int)(pace_sec / 60);
     int pace_rem = (int)(pace_sec % 60);
-    snprintf(top_left_buf, sizeof(top_left_buf), "%d:%02d/%s",
-             pace_min, pace_rem, distance_unit_label);
+    snprintf(pace_header_buf, sizeof(pace_header_buf), "%d:%02d/%s", pace_min, pace_rem, distance_unit_label);
     snprintf(pace_value_buf, sizeof(pace_value_buf), "%d:%02d", pace_min, pace_rem);
   } else {
-    snprintf(top_left_buf, sizeof(top_left_buf), "--:--/%s", distance_unit_label);
+    snprintf(pace_header_buf, sizeof(pace_header_buf), "--:--/%s", distance_unit_label);
     snprintf(pace_value_buf, sizeof(pace_value_buf), "--:--");
   }
-
-  snprintf(top_right_buf, sizeof(top_right_buf), "%ld.%02ld%s",
-           (long)(distance_x100 / 100),
-           (long)(distance_x100 % 100 < 0 ? -(distance_x100 % 100) : (distance_x100 % 100)),
-           distance_unit_label);
+  snprintf(distance_buf, sizeof(distance_buf), "%ld.%02ld%s",
+           (long)(distance_x100 / 100), (long)labs(distance_x100 % 100), distance_unit_label);
   snprintf(timer_value_buf, sizeof(timer_value_buf), "%ld:%02ld",
            (long)(elapsed_s / 60), (long)(elapsed_s % 60));
   snprintf(steps_value_buf, sizeof(steps_value_buf), "%ld", (long)steps);
@@ -387,9 +400,10 @@ static void prv_update_display(void) {
     snprintf(hr_value_buf, sizeof(hr_value_buf), "--");
   }
 
-  text_layer_set_text(s_top_time_layer, top_time_buf);
-  text_layer_set_text(s_top_left_layer, top_left_buf);
-  text_layer_set_text(s_top_right_layer, top_right_buf);
+  text_layer_set_text(s_top_time_layer, profile_name);
+  text_layer_set_text(s_top_left_layer, top_time_buf);
+  text_layer_set_text(s_top_right_layer, pace_header_buf);
+  text_layer_set_text(s_top_stats_right_layer, distance_buf);
   text_layer_set_text(s_mid_left_value_layer, pace_value_buf);
   text_layer_set_text(s_mid_center_value_layer, hr_value_buf);
   text_layer_set_text(s_mid_right_value_layer, timer_value_buf);
@@ -539,23 +553,15 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   const int16_t row_h = bounds.size.h;
   const int16_t value_y = row_h - 34;
   const int16_t icon_size = 30;
-  const int16_t weight_col_w = (row_w * 40) / 100;
-  const int16_t terrain_col_w = (row_w * 38) / 100;
+  const int16_t weight_col_w = row_w / 3;
+  const int16_t terrain_col_w = row_w / 3;
   const int16_t grade_col_x = weight_col_w + terrain_col_w;
   const GFont title_font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
-  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
+  bool is_highlighted = menu_cell_layer_is_highlighted(cell_layer);
   GColor bg = GColorBlack;
 
-  if (s_settings.profile_names[row][0] != '\0') {
-    title_text = s_settings.profile_names[row];
-  } else if (row == 0) {
-    title_text = "Two Mabels, offroad";
-  } else if (row == 1) {
-    title_text = "One Mabel, roads and tracks";
-  } else {
-    snprintf(legacy_title, sizeof(legacy_title), "Profile %d", row + 1);
-    title_text = legacy_title;
-  }
+  title_text = prv_profile_display_name(row, legacy_title, sizeof(legacy_title));
   snprintf(weight_value, sizeof(weight_value), "%ld.%ld%s",
            (long)(p->ruck_weight_value / 10), (long)labs(p->ruck_weight_value % 10), weight_unit);
   snprintf(terrain_value, sizeof(terrain_value), "%s", prv_terrain_label(p->terrain_factor));
@@ -564,6 +570,12 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
 
   graphics_context_set_fill_color(ctx, bg);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  if (is_highlighted) {
+    // Draw a thicker selection frame so the active profile is unambiguous.
+    graphics_context_set_stroke_color(ctx, GColorWhite);
+    graphics_context_set_stroke_width(ctx, 2);
+    graphics_draw_rect(ctx, GRect(1, 1, row_w - 2, row_h - 2));
+  }
   if (row > 0) {
     graphics_context_set_stroke_color(ctx, GColorDarkGray);
     graphics_draw_line(ctx, GPoint(0, 0), GPoint(row_w - 1, 0));
@@ -582,11 +594,11 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   if (s_profile_grade_icon) {
     graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(grade_col_x, y + value_y + 2, icon_size, icon_size));
   }
-  graphics_draw_text(ctx, weight_value, value_font, GRect(icon_size + 2, y + value_y + 5, weight_col_w - (icon_size + 2), 22),
+  graphics_draw_text(ctx, weight_value, value_font, GRect(icon_size + 1, y + value_y + 5, weight_col_w - (icon_size + 1), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, terrain_value, value_font, GRect(weight_col_w + icon_size + 2, y + value_y + 5, terrain_col_w - (icon_size + 2), 22),
+  graphics_draw_text(ctx, terrain_value, value_font, GRect(weight_col_w + icon_size + 1, y + value_y + 5, terrain_col_w - (icon_size + 1), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, grade_value, value_font, GRect(grade_col_x + icon_size + 2, y + value_y + 5, row_w - (grade_col_x + icon_size + 2), 22),
+  graphics_draw_text(ctx, grade_value, value_font, GRect(grade_col_x + icon_size + 1, y + value_y + 5, row_w - (grade_col_x + icon_size + 1), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 }
 
@@ -603,10 +615,79 @@ static void prv_profile_select_callback(MenuLayer *menu_layer, MenuIndex *cell_i
   prv_update_display();
 }
 
+static void prv_main_back_click_handler(ClickRecognizerRef recognizer, void *context) {
+  (void)recognizer;
+  (void)context;
+  if (!window_stack_contains_window(s_profile_window)) {
+    window_stack_push(s_profile_window, true);
+  }
+}
+
+static uint16_t prv_music_get_num_rows_callback(MenuLayer *menu_layer, uint16_t section_index, void *context) {
+  (void)menu_layer;
+  (void)section_index;
+  (void)context;
+  return 3;
+}
+
+static void prv_music_draw_row_callback(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *context) {
+  (void)context;
+  static const char *k_titles[] = { "Play / Pause", "Next Track", "Previous Track" };
+  int row = cell_index->row;
+  if (row < 0 || row > 2) {
+    return;
+  }
+  menu_cell_basic_draw(ctx, cell_layer, k_titles[row], NULL, NULL);
+}
+
+static void prv_music_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *context) {
+  (void)menu_layer;
+  (void)cell_index;
+  (void)context;
+  vibes_short_pulse();
+}
+
+static void prv_music_window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+  GRect menu_bounds = GRect(SCREEN_PADDING, SCREEN_PADDING,
+                            bounds.size.w - (2 * SCREEN_PADDING),
+                            bounds.size.h - (2 * SCREEN_PADDING));
+  s_music_menu_layer = menu_layer_create(menu_bounds);
+  menu_layer_set_click_config_onto_window(s_music_menu_layer, window);
+  menu_layer_set_callbacks(s_music_menu_layer, NULL, (MenuLayerCallbacks) {
+    .get_num_rows = prv_music_get_num_rows_callback,
+    .draw_row = prv_music_draw_row_callback,
+    .select_click = prv_music_select_callback,
+  });
+  layer_add_child(window_layer, menu_layer_get_layer(s_music_menu_layer));
+}
+
+static void prv_music_window_unload(Window *window) {
+  (void)window;
+  menu_layer_destroy(s_music_menu_layer);
+  s_music_menu_layer = NULL;
+}
+
+static void prv_main_up_click_handler(ClickRecognizerRef recognizer, void *context) {
+  (void)recognizer;
+  (void)context;
+  window_stack_push(s_music_window, true);
+}
+
+static void prv_main_click_config_provider(void *context) {
+  (void)context;
+  window_single_click_subscribe(BUTTON_ID_BACK, prv_main_back_click_handler);
+  window_single_click_subscribe(BUTTON_ID_UP, prv_main_up_click_handler);
+}
+
 static void prv_profile_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
-  s_profile_menu_layer = menu_layer_create(bounds);
+  GRect menu_bounds = GRect(SCREEN_PADDING, SCREEN_PADDING,
+                            bounds.size.w - (2 * SCREEN_PADDING),
+                            bounds.size.h - (2 * SCREEN_PADDING));
+  s_profile_menu_layer = menu_layer_create(menu_bounds);
   menu_layer_set_click_config_onto_window(s_profile_menu_layer, window);
   menu_layer_set_callbacks(s_profile_menu_layer, NULL, (MenuLayerCallbacks) {
     .get_num_rows = prv_profile_get_num_rows_callback,
@@ -639,31 +720,37 @@ static void prv_profile_window_unload(Window *window) {
 static void prv_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
-  int w = bounds.size.w;
+  int x0 = SCREEN_PADDING;
+  int y0 = SCREEN_PADDING;
+  int w = bounds.size.w - (2 * SCREEN_PADDING);
+  int h = bounds.size.h - (2 * SCREEN_PADDING);
+  int header_name_w = (w * 2) / 3;
 
   window_set_background_color(window, GColorBlack);
+  window_set_click_config_provider(window, prv_main_click_config_provider);
 
-  s_grid_layer = layer_create(bounds);
+  s_grid_layer = layer_create(GRect(x0, y0, w, h));
   layer_set_update_proc(s_grid_layer, prv_grid_layer_update_proc);
   layer_add_child(window_layer, s_grid_layer);
 
-  s_top_time_layer = text_layer_create(GRect(0, 0, w, 30));
-  s_top_left_layer = text_layer_create(GRect(8, 36, (w / 2) - 10, 28));
-  s_top_right_layer = text_layer_create(GRect((w / 2) + 2, 36, (w / 2) - 10, 28));
+  s_top_time_layer = text_layer_create(GRect(x0, y0, header_name_w, 30));
+  s_top_left_layer = text_layer_create(GRect(x0 + header_name_w, y0, w - header_name_w, 30));
+  s_top_right_layer = text_layer_create(GRect(x0, y0 + 30, w / 2, 24));
+  s_top_stats_right_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 30, w - (w / 2), 24));
 
-  s_mid_left_icon_layer = bitmap_layer_create(GRect(26, 80, 24, 24));
-  s_mid_left_value_layer = text_layer_create(GRect(8, 100, 60, 36));
-  s_mid_center_icon_layer = bitmap_layer_create(GRect((w / 2) - 12, 80, 24, 24));
-  s_mid_center_value_layer = text_layer_create(GRect((w / 2) - 24, 102, 48, 30));
-  s_mid_right_icon_layer = bitmap_layer_create(GRect(w - 50, 80, 24, 24));
-  s_mid_right_value_layer = text_layer_create(GRect(w - 68, 100, 60, 36));
+  s_mid_left_icon_layer = bitmap_layer_create(GRect(x0 + (w / 4) - 12, y0 + 80, 24, 24));
+  s_mid_left_value_layer = text_layer_create(GRect(x0, y0 + 100, w / 2, 36));
+  s_mid_center_icon_layer = bitmap_layer_create(GRect(x0 + (w / 2) - 12, y0 + 80, 24, 24));
+  s_mid_center_value_layer = text_layer_create(GRect(x0 + (w / 2) - 24, y0 + 102, 48, 30));
+  s_mid_right_icon_layer = bitmap_layer_create(GRect(x0 + ((w * 3) / 4) - 12, y0 + 80, 24, 24));
+  s_mid_right_value_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 100, w - (w / 2), 36));
 
-  s_bottom_left_icon_layer = bitmap_layer_create(GRect(38, 144, 24, 24));
-  s_bottom_left_value_layer = text_layer_create(GRect(8, 162, (w / 2) - 12, 28));
-  s_bottom_left_secondary_layer = text_layer_create(GRect(8, 188, (w / 2) - 12, 28));
-  s_bottom_right_icon_layer = bitmap_layer_create(GRect((w / 2) + 34, 144, 24, 24));
-  s_bottom_right_value_layer = text_layer_create(GRect((w / 2) + 4, 162, (w / 2) - 12, 28));
-  s_bottom_right_secondary_layer = text_layer_create(GRect((w / 2) + 4, 188, (w / 2) - 12, 28));
+  s_bottom_left_icon_layer = bitmap_layer_create(GRect(x0 + (w / 4) - 12, y0 + 144, 24, 24));
+  s_bottom_left_value_layer = text_layer_create(GRect(x0, y0 + 162, w / 2, 28));
+  s_bottom_left_secondary_layer = text_layer_create(GRect(x0, y0 + 188, w / 2, 28));
+  s_bottom_right_icon_layer = bitmap_layer_create(GRect(x0 + ((w * 3) / 4) - 12, y0 + 144, 24, 24));
+  s_bottom_right_value_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 162, w - (w / 2), 28));
+  s_bottom_right_secondary_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 188, w - (w / 2), 28));
 
   s_runner_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_RUNNER);
   s_heart_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_HEART);
@@ -681,9 +768,10 @@ static void prv_window_load(Window *window) {
   bitmap_layer_set_background_color(s_bottom_left_icon_layer, GColorClear);
   bitmap_layer_set_background_color(s_bottom_right_icon_layer, GColorClear);
 
-  prv_set_text_style(s_top_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
-  prv_set_text_style(s_top_left_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter, GColorWhite);
-  prv_set_text_style(s_top_right_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_top_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentLeft, GColorWhite);
+  prv_set_text_style(s_top_left_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentRight, GColorWhite);
+  prv_set_text_style(s_top_right_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18), GTextAlignmentCenter, GColorWhite);
+  prv_set_text_style(s_top_stats_right_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18), GTextAlignmentCenter, GColorWhite);
   prv_set_text_style(s_mid_left_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
   prv_set_text_style(s_mid_center_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), GTextAlignmentCenter, GColorWhite);
   prv_set_text_style(s_mid_right_value_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), GTextAlignmentCenter, GColorWhite);
@@ -696,10 +784,12 @@ static void prv_window_load(Window *window) {
   text_layer_set_overflow_mode(s_bottom_right_secondary_layer, GTextOverflowModeWordWrap);
   text_layer_set_overflow_mode(s_top_left_layer, GTextOverflowModeTrailingEllipsis);
   text_layer_set_overflow_mode(s_top_right_layer, GTextOverflowModeTrailingEllipsis);
+  text_layer_set_overflow_mode(s_top_stats_right_layer, GTextOverflowModeTrailingEllipsis);
 
   layer_add_child(window_layer, text_layer_get_layer(s_top_time_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_top_left_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_top_right_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_top_stats_right_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_mid_left_icon_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_mid_left_value_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_mid_center_icon_layer));
@@ -719,6 +809,7 @@ static void prv_window_unload(Window *window) {
   text_layer_destroy(s_top_time_layer);
   text_layer_destroy(s_top_left_layer);
   text_layer_destroy(s_top_right_layer);
+  text_layer_destroy(s_top_stats_right_layer);
   bitmap_layer_destroy(s_mid_left_icon_layer);
   text_layer_destroy(s_mid_left_value_layer);
   bitmap_layer_destroy(s_mid_center_icon_layer);
@@ -753,6 +844,12 @@ static void prv_init(void) {
     .unload = prv_profile_window_unload,
   });
 
+  s_music_window = window_create();
+  window_set_window_handlers(s_music_window, (WindowHandlers) {
+    .load = prv_music_window_load,
+    .unload = prv_music_window_unload,
+  });
+
   time_t now = time(NULL);
   s_start_time = now;
   struct tm *start_tm = localtime(&now);
@@ -784,6 +881,7 @@ static void prv_deinit(void) {
   if (s_health_available) {
     health_service_events_unsubscribe();
   }
+  window_destroy(s_music_window);
   window_destroy(s_profile_window);
   window_destroy(s_window);
 }
