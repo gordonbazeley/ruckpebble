@@ -126,6 +126,16 @@ static void prv_set_profile_name(int32_t profile_index, const char *name) {
   s_settings.profile_names[profile_index][PROFILE_NAME_MAX_LEN - 1] = '\0';
 }
 
+static const char *prv_terrain_label(int32_t terrain_factor_hundredths) {
+  if (terrain_factor_hundredths <= 120) {
+    return "Road";
+  }
+  if (terrain_factor_hundredths <= 170) {
+    return "Mixed";
+  }
+  return "Hilly";
+}
+
 static ProfileSettings *prv_active_profile(void) {
   return &s_settings.profiles[prv_active_profile_index()];
 }
@@ -519,7 +529,7 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   ProfileSettings *p = &s_settings.profiles[row];
   static char legacy_title[16];
   static char weight_value[12];
-  static char terrain_value[8];
+  static char terrain_value[12];
   static char grade_value[8];
   const char *title_text = legacy_title;
   const char *weight_unit = (s_settings.ruck_weight_unit == 1) ? "lb" : "kg";
@@ -529,11 +539,11 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   const int16_t row_h = bounds.size.h;
   const int16_t value_y = row_h - 34;
   const int16_t icon_size = 30;
-  const int16_t weight_col_w = (row_w * 42) / 100;
-  const int16_t terrain_col_w = (row_w - weight_col_w) / 2;
+  const int16_t weight_col_w = (row_w * 40) / 100;
+  const int16_t terrain_col_w = (row_w * 38) / 100;
   const int16_t grade_col_x = weight_col_w + terrain_col_w;
   const GFont title_font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
-  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
   GColor bg = GColorBlack;
 
   if (s_settings.profile_names[row][0] != '\0') {
@@ -548,8 +558,7 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   }
   snprintf(weight_value, sizeof(weight_value), "%ld.%ld%s",
            (long)(p->ruck_weight_value / 10), (long)labs(p->ruck_weight_value % 10), weight_unit);
-  snprintf(terrain_value, sizeof(terrain_value), "%ld.%02ld",
-           (long)(p->terrain_factor / 100), (long)labs(p->terrain_factor % 100));
+  snprintf(terrain_value, sizeof(terrain_value), "%s", prv_terrain_label(p->terrain_factor));
   snprintf(grade_value, sizeof(grade_value), "%ld.%ld",
            (long)(p->grade_percent / 10), (long)labs(p->grade_percent % 10));
 
