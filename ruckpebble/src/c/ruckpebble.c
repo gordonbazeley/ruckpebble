@@ -524,9 +524,12 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   const char *title_text = legacy_title;
   const int16_t y = 0;
   const int16_t row_h = layer_get_bounds((Layer *)cell_layer).size.h;
-  const int16_t value_y = row_h - 30;
-  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
-  GCompOp icon_comp = menu_cell_layer_is_highlighted(cell_layer) ? GCompOpSet : GCompOpAssignInverted;
+  const int16_t value_y = row_h - 26;
+  const int16_t icon_size = 20;
+  const GFont title_font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
+  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+  bool is_highlighted = menu_cell_layer_is_highlighted(cell_layer);
+  GColor bg = is_highlighted ? GColorDarkGray : GColorBlack;
 
   if (s_settings.profile_names[row][0] != '\0') {
     title_text = s_settings.profile_names[row];
@@ -545,23 +548,27 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   snprintf(grade_value, sizeof(grade_value), "%ld.%ld",
            (long)(p->grade_percent / 10), (long)labs(p->grade_percent % 10));
 
-  menu_cell_basic_draw(ctx, cell_layer, title_text, NULL, NULL);
+  graphics_context_set_fill_color(ctx, bg);
+  graphics_fill_rect(ctx, layer_get_bounds((Layer *)cell_layer), 0, GCornerNone);
+  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_draw_text(ctx, title_text, title_font, GRect(6, y + 2, 138, 24),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 
-  graphics_context_set_compositing_mode(ctx, icon_comp);
+  graphics_context_set_compositing_mode(ctx, GCompOpSet);
   if (s_profile_weight_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(2, y + value_y + 4, 18, 18));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(2, y + value_y + 2, icon_size, icon_size));
   }
   if (s_profile_terrain_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(50, y + value_y + 4, 18, 18));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(50, y + value_y + 2, icon_size, icon_size));
   }
   if (s_profile_grade_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(98, y + value_y + 4, 18, 18));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(98, y + value_y + 2, icon_size, icon_size));
   }
-  graphics_draw_text(ctx, weight_value, value_font, GRect(20, y + value_y, 30, 28),
+  graphics_draw_text(ctx, weight_value, value_font, GRect(24, y + value_y + 3, 24, 18),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, terrain_value, value_font, GRect(68, y + value_y, 30, 28),
+  graphics_draw_text(ctx, terrain_value, value_font, GRect(72, y + value_y + 3, 24, 18),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, grade_value, value_font, GRect(116, y + value_y, 28, 28),
+  graphics_draw_text(ctx, grade_value, value_font, GRect(120, y + value_y + 3, 24, 18),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 }
 
