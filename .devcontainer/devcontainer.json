@@ -26,12 +26,12 @@
     },
     "codespaces": {
       "openFiles": [
-        "src/c/ruckpebble.c"
+        "ruckpebble/src/c/ruckpebble.c"
       ]
     }
   },
 
-  "workspaceFolder": "${containerWorkspaceFolder}/ruckpebble",
+  "workspaceFolder": "${containerWorkspaceFolder}",
   "containerEnv": {
     "LOCALWORKSPACEFOLDERBASENAME": "${localWorkspaceFolderBasename}",
     "LOCALWORKSPACEFOLDER": "${localWorkspaceFolder}",
