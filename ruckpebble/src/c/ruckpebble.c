@@ -518,18 +518,21 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   }
   ProfileSettings *p = &s_settings.profiles[row];
   static char legacy_title[16];
-  static char weight_value[8];
+  static char weight_value[12];
   static char terrain_value[8];
   static char grade_value[8];
   const char *title_text = legacy_title;
+  const char *weight_unit = (s_settings.ruck_weight_unit == 1) ? "lb" : "kg";
   const int16_t y = 0;
-  const int16_t row_h = layer_get_bounds((Layer *)cell_layer).size.h;
-  const int16_t value_y = row_h - 26;
-  const int16_t icon_size = 20;
+  GRect bounds = layer_get_bounds((Layer *)cell_layer);
+  const int16_t row_w = bounds.size.w;
+  const int16_t row_h = bounds.size.h;
+  const int16_t value_y = row_h - 28;
+  const int16_t icon_size = 24;
+  const int16_t col_w = row_w / 3;
   const GFont title_font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
-  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
-  bool is_highlighted = menu_cell_layer_is_highlighted(cell_layer);
-  GColor bg = is_highlighted ? GColorDarkGray : GColorBlack;
+  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+  GColor bg = GColorBlack;
 
   if (s_settings.profile_names[row][0] != '\0') {
     title_text = s_settings.profile_names[row];
@@ -541,34 +544,34 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
     snprintf(legacy_title, sizeof(legacy_title), "Profile %d", row + 1);
     title_text = legacy_title;
   }
-  snprintf(weight_value, sizeof(weight_value), "%ld.%ld",
-           (long)(p->ruck_weight_value / 10), (long)labs(p->ruck_weight_value % 10));
+  snprintf(weight_value, sizeof(weight_value), "%ld.%ld%s",
+           (long)(p->ruck_weight_value / 10), (long)labs(p->ruck_weight_value % 10), weight_unit);
   snprintf(terrain_value, sizeof(terrain_value), "%ld.%02ld",
            (long)(p->terrain_factor / 100), (long)labs(p->terrain_factor % 100));
   snprintf(grade_value, sizeof(grade_value), "%ld.%ld",
            (long)(p->grade_percent / 10), (long)labs(p->grade_percent % 10));
 
   graphics_context_set_fill_color(ctx, bg);
-  graphics_fill_rect(ctx, layer_get_bounds((Layer *)cell_layer), 0, GCornerNone);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   graphics_context_set_text_color(ctx, GColorWhite);
-  graphics_draw_text(ctx, title_text, title_font, GRect(6, y + 2, 138, 24),
+  graphics_draw_text(ctx, title_text, title_font, GRect(0, y + 2, row_w, 24),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 
   graphics_context_set_compositing_mode(ctx, GCompOpSet);
   if (s_profile_weight_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(2, y + value_y + 2, icon_size, icon_size));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(0, y + value_y + 2, icon_size, icon_size));
   }
   if (s_profile_terrain_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(50, y + value_y + 2, icon_size, icon_size));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(col_w, y + value_y + 2, icon_size, icon_size));
   }
   if (s_profile_grade_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(98, y + value_y + 2, icon_size, icon_size));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(col_w * 2, y + value_y + 2, icon_size, icon_size));
   }
-  graphics_draw_text(ctx, weight_value, value_font, GRect(24, y + value_y + 3, 24, 18),
+  graphics_draw_text(ctx, weight_value, value_font, GRect(24, y + value_y + 2, col_w - 24, 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, terrain_value, value_font, GRect(72, y + value_y + 3, 24, 18),
+  graphics_draw_text(ctx, terrain_value, value_font, GRect(col_w + 24, y + value_y + 2, col_w - 24, 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, grade_value, value_font, GRect(120, y + value_y + 3, 24, 18),
+  graphics_draw_text(ctx, grade_value, value_font, GRect((col_w * 2) + 24, y + value_y + 2, row_w - ((col_w * 2) + 24), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 }
 
