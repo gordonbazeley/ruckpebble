@@ -31,6 +31,9 @@
       "profile3_ruck_weight_value",
       "profile3_terrain_factor",
       "profile3_grade_percent",
+      "profile1_name",
+      "profile2_name",
+      "profile3_name",
       "sim_steps_enabled",
       "sim_steps_spm"
     ],
@@ -60,6 +63,21 @@
           "type": "png",
           "name": "ICON_FIRE",
           "file": "icons/sunny.png"
+        },
+        {
+          "type": "png",
+          "name": "ICON_WEIGHT",
+          "file": "icons/weight.png"
+        },
+        {
+          "type": "png",
+          "name": "ICON_TERRAIN",
+          "file": "icons/map.png"
+        },
+        {
+          "type": "png",
+          "name": "ICON_GRADE",
+          "file": "icons/elevation.png"
         }
       ]
     }
