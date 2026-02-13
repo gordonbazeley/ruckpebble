@@ -31,7 +31,7 @@
     }
   },
 
-  "workspaceFolder": "/workspaces/codespaces-pebble/ruckpebble",
+  "workspaceFolder": "${containerWorkspaceFolder}/ruckpebble",
   "containerEnv": {
     "LOCALWORKSPACEFOLDERBASENAME": "${localWorkspaceFolderBasename}",
     "LOCALWORKSPACEFOLDER": "${localWorkspaceFolder}",
