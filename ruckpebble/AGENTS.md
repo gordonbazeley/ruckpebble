@@ -20,17 +20,7 @@ You have my permissions to always run commands that start with pebble
 ## Approved Command Prefixes
 - `pebble build`
 - `pebble install --emulator emery`
-- `pebble screenshot /tmp/emu_check.png`
-- `pebble screenshot /tmp/emu_now.png`
-- `pebble screenshot /tmp/emu_profile_now.png`
-- `pebble screenshot /tmp/emu_after_fix.png`
-- `pebble screenshot /tmp/emu_secondline_restored.png`
-- `pebble screenshot /tmp/emu_profile_fixed.png`
-- `pebble screenshot /tmp/emu_layout_alignment.png`
-- `pebble screenshot /tmp/emu_layout_alignment_running.png`
-- `pebble screenshot /tmp/emu_music_screen.png`
-- `pebble screenshot /tmp/emu_back_to_ruck.png`
-- `pebble screenshot /tmp/emu_running_secondline.png`
+- `pebble screenshot` (any output path/filename)
 - `pebble emu-button back`
 - `pebble emu-button click back`
 - `pebble emu-button click select`
