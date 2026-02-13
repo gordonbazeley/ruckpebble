@@ -502,7 +502,7 @@ static int16_t prv_profile_get_cell_height_callback(MenuLayer *menu_layer, MenuI
   (void)menu_layer;
   (void)cell_index;
   (void)context;
-  return 52;
+  return 44;
 }
 
 static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *context) {
@@ -513,13 +513,12 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   }
   ProfileSettings *p = &s_settings.profiles[row];
   static char legacy_title[16];
-  static char weight_value[16];
-  static char terrain_value[16];
-  static char grade_value[16];
+  static char weight_value[8];
+  static char terrain_value[8];
+  static char grade_value[8];
   const char *title_text = legacy_title;
-  const char *unit = s_settings.ruck_weight_unit == 1 ? "lb" : "kg";
   const int16_t y = 0;
-  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+  const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
   GCompOp icon_comp = menu_cell_layer_is_highlighted(cell_layer) ? GCompOpAssignInverted : GCompOpSet;
 
   if (s_settings.profile_names[row][0] != '\0') {
@@ -528,30 +527,30 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
     snprintf(legacy_title, sizeof(legacy_title), "Profile %d", row + 1);
     title_text = legacy_title;
   }
-  snprintf(weight_value, sizeof(weight_value), "%ld.%ld%s",
-           (long)(p->ruck_weight_value / 10), (long)labs(p->ruck_weight_value % 10), unit);
+  snprintf(weight_value, sizeof(weight_value), "%ld.%ld",
+           (long)(p->ruck_weight_value / 10), (long)labs(p->ruck_weight_value % 10));
   snprintf(terrain_value, sizeof(terrain_value), "%ld.%02ld",
            (long)(p->terrain_factor / 100), (long)labs(p->terrain_factor % 100));
-  snprintf(grade_value, sizeof(grade_value), "%ld.%ld%%",
+  snprintf(grade_value, sizeof(grade_value), "%ld.%ld",
            (long)(p->grade_percent / 10), (long)labs(p->grade_percent % 10));
 
   menu_cell_basic_draw(ctx, cell_layer, title_text, NULL, NULL);
 
   graphics_context_set_compositing_mode(ctx, icon_comp);
   if (s_profile_weight_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(4, y + 24, 24, 24));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(2, y + 22, 12, 12));
   }
   if (s_profile_terrain_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(50, y + 24, 24, 24));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(50, y + 22, 12, 12));
   }
   if (s_profile_grade_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(96, y + 24, 24, 24));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(98, y + 22, 12, 12));
   }
-  graphics_draw_text(ctx, weight_value, value_font, GRect(28, y + 27, 22, 16),
+  graphics_draw_text(ctx, weight_value, value_font, GRect(16, y + 20, 32, 16),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, terrain_value, value_font, GRect(74, y + 27, 22, 16),
+  graphics_draw_text(ctx, terrain_value, value_font, GRect(64, y + 20, 32, 16),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, grade_value, value_font, GRect(120, y + 27, 24, 16),
+  graphics_draw_text(ctx, grade_value, value_font, GRect(112, y + 20, 32, 16),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 }
 

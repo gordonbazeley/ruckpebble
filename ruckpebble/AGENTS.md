@@ -7,7 +7,7 @@
 - `package.json`: Pebble metadata (targets, UUID, resources).
 
 ## Build, Test, and Development Commands
-You have my permissions to always run the pebble commands
+You have my permissions to always run commands that start with pebble
 - `pebble build`: Compile the watchapp using the Pebble SDK and `wscript`. 
 - `pebble install --emulator <platform>`: Build and install to an emulator (e.g., `basalt`).
 - `pebble clean`: Remove `build/` artifacts.
