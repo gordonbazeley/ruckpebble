@@ -89,6 +89,9 @@
     var p2TerrainType = terrainTypeFromSettings(s.profile2_terrain_type, s.profile2_terrain_factor);
     var p3TerrainType = terrainTypeFromSettings(s.profile3_terrain_type, s.profile3_terrain_factor);
     var terrainOptions = terrainOptionsHtml();
+    var weightIcon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABYUlEQVR4AeRU4VUDMQgmncARdAPdQCdwBN3AbtJVdAPdoBvoBk6g9IOQ3LWBK32v/dW8EDj44MuRvKzowuOKCJh5w9PYZDubatEfihPTmqaxBleKJEUAkBYvNoxHfWaHCrlh7CyBkAAt+OV/rJjKVIjYHGiXulhGxXyrw1lcAuS9AnsDOZhgEY8p7jbfIsdtmUuAvDdLfrK2u2oFL7APRMr4Qs6ICO4Fi/xP0UsCzFbi2JDmiD2XiKDuaY5ctDnEhwS8WDAfDAnyJSoy2tBAgNvwKCk4tqP9F1yVsi0wkDucw0AAnBJAf0Gy88OAw03yCJ4NfMIf0DvV0TZXv7B6BPqbuH5pAmD1qqKe5kL36RH04ClG+pBbUX1ipgXnN5vqn33jjZJDbm9UqyHa+4M7Caholi546cRj+zSXePakEJ6NPQ8NBOjnD6TIOyO6izp06a7J6P52Fp1lIOiRMxkXJ9gBAAD//+xKIa4AAAAGSURBVAMAmz2PMR1V/7YAAAAASUVORK5CYII=';
+    var terrainIcon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABqElEQVR4AdyU4VHDMAyFnzoBbACbwAawAWwAE1AmgA1gA9igbNJuABNEfHZsx65zvVyP/kEn2crTs56T9rTSie2fC7j7mvAhLO53h74mlDNiQ3zUvO4TQXjw1BLiEyELi/TmkxUxIC4xOJRv4kryG/bijQBkp/JCKCTsX8TorjpHbIjXgPikfAX11ghMZTtfWbTrjNnKrg3j+VKmnVjim5mC8Dml+ChwVdYLcHXIPxWnSantiMsMkgfhik+DXGTvBQCP9tg7vUhq0gu09USb22K3tjBzthdojxx4mukWNeNSzi0QcP4ohb8gaYUXCNje/2KBRkVZIFCxj0gXCLTftNaYr7ToAgGrezb5fKVFe4H2AjTsALDRu0rbO5J6gURiLsXpqPQTM3i2YBcq5qkyAtTOxqxdewGXnG7Q8nQkjR6abwfHBt+I9lDhOiMaVAp8cZqYvBeItfQa0rMx5Zg3JtN9KNm4XI1bWEUeUWGPBp+9+L7Ap0xlOtJ4rWTk70R0oHsiO5cw2sbSawbz3ghAuSX2pmOmTjucIkZeLjExpqwRmOC/y04u8AsAAP//3EypAQAAAAZJREFUAwCgdJgxQLeyzwAAAABJRU5ErkJggg==';
+    var gradeIcon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAB30lEQVR4AcyUi1XsMAxEpa2AEnY74nXw6IAOgAooATqAEuhk6QAqwNwZO04M4bN8zsHHlmRFmrGlJJv45fH3CUop2/eK8K0bAH4F+B59jPbEPrLRxJcJADoF4z9L806irYemrb5EALjKcmmEiF1mPsrGXyKY2rR1MAEgR+TuG9AF4PfsAz8+WeM6mID0VoK8BfycvcBvOPf2xeH1KN4k4ESlPJV5TLbSStwD/i8YBEBSjhM7ZqGd1yoBSXo7oiaU8HCyrchN7mQRp16cRQ3cfeoGLclvR3psLCehXTCIq72o/LUXPkR1EOK5dgOa5aATR7wtHhyV0XsRHmaxJTEQcCrA5U7V+FoWvtUZ1CMjFOdehIYZLbTz6gSgqCx+EyjHVOPaC4Uu82xnTHF67JWWg+gEeOvXmDGBq4EiDYCSxlpZqBEY5KzMkaUTEK/rotIfDpl7qoCKj3qhmMXy9fq+E3QPBuXatzCRXuM6YOYQ+4oA8FMauFUYZXG5howPN+1oLe4VAWW5bM8OBx+xDTMQ6G9gb+j8of88F5IXtZx2WZTl76SmVYRJdoJSypVh25P5MCteu5LLEmwbremkpSPmnx2vzwkrqftS2Z5Fez+bY9zhbA5xTavfYHL8tP51gmcAAAD//2tJwoIAAAAGSURBVAMAu73qMUTY1OoAAAAASUVORK5CYII=';
     var html = '' +
       '<!doctype html><html><head><meta charset="utf-8">' +
       '<meta name="viewport" content="width=device-width,initial-scale=1">' +
@@ -97,6 +100,9 @@
       'body{font-family:Helvetica,Arial,sans-serif;margin:16px;background:#f5f5f5;color:#111;}' +
       'h1{font-size:20px;margin:0 0 12px;}h2{font-size:16px;margin:18px 0 8px;}' +
       'label{display:block;margin:10px 0 4px;font-weight:600;}' +
+      '.icon-label{display:flex;align-items:center;gap:6px;}' +
+      '.icon-label img{width:14px;height:14px;display:inline-block;filter:brightness(0) invert(1);}' +
+      '.icon-chip{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:#111;}' +
       'input,select{width:100%;padding:8px;font-size:14px;box-sizing:border-box;}' +
       '.row{display:flex;gap:8px;}.row>div{flex:1;}' +
       '.card{background:#fff;border-radius:8px;padding:12px;margin-top:10px;}' +
@@ -117,23 +123,23 @@
 
       '<div class="card"><h2>Profile 1</h2>' +
       '<label>Profile name (optional)</label><input type="text" id="p1_name" maxlength="32">' +
-      '<label id="p1_ruck_weight_label">Ruck weight (kg)</label><input type="number" id="p1_ruck_weight_value" step="0.1">' +
-      '<label>Terrain</label><select id="p1_terrain_type">' + terrainOptions + '</select>' +
-      '<label>Grade (%)</label><input type="number" id="p1_grade_percent" step="0.1">' +
+      '<label id="p1_ruck_weight_label" class="icon-label"><span>Ruck weight (kg)</span><span class="icon-chip"><img src="' + weightIcon + '" alt=""></span></label><input type="number" id="p1_ruck_weight_value" step="0.1">' +
+      '<label class="icon-label"><span>Terrain</span><span class="icon-chip"><img src="' + terrainIcon + '" alt=""></span></label><select id="p1_terrain_type">' + terrainOptions + '</select>' +
+      '<label class="icon-label"><span>Grade (%)</span><span class="icon-chip"><img src="' + gradeIcon + '" alt=""></span></label><input type="number" id="p1_grade_percent" step="0.1">' +
       '</div>' +
 
       '<div class="card"><h2>Profile 2</h2>' +
       '<label>Profile name (optional)</label><input type="text" id="p2_name" maxlength="32">' +
-      '<label id="p2_ruck_weight_label">Ruck weight (kg)</label><input type="number" id="p2_ruck_weight_value" step="0.1">' +
-      '<label>Terrain</label><select id="p2_terrain_type">' + terrainOptions + '</select>' +
-      '<label>Grade (%)</label><input type="number" id="p2_grade_percent" step="0.1">' +
+      '<label id="p2_ruck_weight_label" class="icon-label"><span>Ruck weight (kg)</span><span class="icon-chip"><img src="' + weightIcon + '" alt=""></span></label><input type="number" id="p2_ruck_weight_value" step="0.1">' +
+      '<label class="icon-label"><span>Terrain</span><span class="icon-chip"><img src="' + terrainIcon + '" alt=""></span></label><select id="p2_terrain_type">' + terrainOptions + '</select>' +
+      '<label class="icon-label"><span>Grade (%)</span><span class="icon-chip"><img src="' + gradeIcon + '" alt=""></span></label><input type="number" id="p2_grade_percent" step="0.1">' +
       '</div>' +
 
       '<div class="card"><h2>Profile 3</h2>' +
       '<label>Profile name (optional)</label><input type="text" id="p3_name" maxlength="32">' +
-      '<label id="p3_ruck_weight_label">Ruck weight (kg)</label><input type="number" id="p3_ruck_weight_value" step="0.1">' +
-      '<label>Terrain</label><select id="p3_terrain_type">' + terrainOptions + '</select>' +
-      '<label>Grade (%)</label><input type="number" id="p3_grade_percent" step="0.1">' +
+      '<label id="p3_ruck_weight_label" class="icon-label"><span>Ruck weight (kg)</span><span class="icon-chip"><img src="' + weightIcon + '" alt=""></span></label><input type="number" id="p3_ruck_weight_value" step="0.1">' +
+      '<label class="icon-label"><span>Terrain</span><span class="icon-chip"><img src="' + terrainIcon + '" alt=""></span></label><select id="p3_terrain_type">' + terrainOptions + '</select>' +
+      '<label class="icon-label"><span>Grade (%)</span><span class="icon-chip"><img src="' + gradeIcon + '" alt=""></span></label><input type="number" id="p3_grade_percent" step="0.1">' +
       '</div>' +
 
       '<button id="save">Save</button>' +
@@ -141,9 +147,9 @@
       'function $(id){return document.getElementById(id);}' +
       'function updateRuckWeightLabels(){' +
       'var unit=($("ruck_weight_unit").value==="1")?"lb":"kg";' +
-      '$("p1_ruck_weight_label").textContent="Ruck weight ("+unit+")";' +
-      '$("p2_ruck_weight_label").textContent="Ruck weight ("+unit+")";' +
-      '$("p3_ruck_weight_label").textContent="Ruck weight ("+unit+")";' +
+      '$("p1_ruck_weight_label").querySelector("span").textContent="Ruck weight ("+unit+")";' +
+      '$("p2_ruck_weight_label").querySelector("span").textContent="Ruck weight ("+unit+")";' +
+      '$("p3_ruck_weight_label").querySelector("span").textContent="Ruck weight ("+unit+")";' +
       '}' +
       'function terrainFactorFromType(t){' +
       'if(t==="road"){return 100;}' +
