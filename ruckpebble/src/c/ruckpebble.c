@@ -95,6 +95,7 @@ static GBitmap *s_fire_icon;
 static GBitmap *s_profile_weight_icon;
 static GBitmap *s_profile_terrain_icon;
 static GBitmap *s_profile_grade_icon;
+static int16_t s_profile_cell_height = PROFILE_ROW_HEIGHT;
 
 static Settings s_settings;
 static time_t s_start_time;
@@ -703,7 +704,7 @@ static int16_t prv_profile_get_cell_height_callback(MenuLayer *menu_layer, MenuI
   (void)menu_layer;
   (void)cell_index;
   (void)context;
-  return PROFILE_ROW_HEIGHT;
+  return s_profile_cell_height;
 }
 
 static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *context) {
@@ -723,11 +724,16 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   GRect bounds = layer_get_bounds((Layer *)cell_layer);
   const int16_t row_w = bounds.size.w;
   const int16_t row_h = bounds.size.h;
+  const int16_t content_x = SCREEN_PADDING;
+  const int16_t content_w = row_w - (2 * SCREEN_PADDING);
   const int16_t value_y = row_h - 32;
   const int16_t icon_y = y + value_y + 2;
-  const int16_t weight_col_w = row_w / 3;
-  const int16_t terrain_col_w = row_w / 3;
-  const int16_t grade_col_x = weight_col_w + terrain_col_w;
+  const int16_t weight_col_x = content_x;
+  const int16_t weight_col_w = content_w / 3;
+  const int16_t terrain_col_x = weight_col_x + weight_col_w;
+  const int16_t terrain_col_w = content_w / 3;
+  const int16_t grade_col_x = terrain_col_x + terrain_col_w;
+  const int16_t grade_col_w = content_w - (weight_col_w + terrain_col_w);
   const int16_t weight_icon_w = s_profile_weight_icon ? gbitmap_get_bounds(s_profile_weight_icon).size.w : 0;
   const int16_t weight_icon_h = s_profile_weight_icon ? gbitmap_get_bounds(s_profile_weight_icon).size.h : 0;
   const int16_t terrain_icon_w = s_profile_terrain_icon ? gbitmap_get_bounds(s_profile_terrain_icon).size.w : 0;
@@ -751,20 +757,20 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   if (row > 0) {
     graphics_context_set_stroke_color(ctx, is_highlighted ? GColorLightGray : GColorDarkGray);
-    graphics_draw_line(ctx, GPoint(0, 0), GPoint(row_w - 1, 0));
+    graphics_draw_line(ctx, GPoint(content_x, 0), GPoint(content_x + content_w - 1, 0));
   }
   graphics_context_set_text_color(ctx, fg);
-  graphics_draw_text(ctx, title_text, title_font, GRect(0, y + 2, row_w, 24),
+  graphics_draw_text(ctx, title_text, title_font, GRect(content_x, y + 2, content_w, 24),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 
   if (is_highlighted) {
     // Keep icon contrast on the white selected row.
     graphics_context_set_fill_color(ctx, GColorBlack);
     if (s_profile_weight_icon) {
-      graphics_fill_rect(ctx, GRect(0, icon_y, weight_icon_w, weight_icon_h), 3, GCornersAll);
+      graphics_fill_rect(ctx, GRect(weight_col_x, icon_y, weight_icon_w, weight_icon_h), 3, GCornersAll);
     }
     if (s_profile_terrain_icon) {
-      graphics_fill_rect(ctx, GRect(weight_col_w, icon_y, terrain_icon_w, terrain_icon_h), 3, GCornersAll);
+      graphics_fill_rect(ctx, GRect(terrain_col_x, icon_y, terrain_icon_w, terrain_icon_h), 3, GCornersAll);
     }
     if (s_profile_grade_icon) {
       graphics_fill_rect(ctx, GRect(grade_col_x, icon_y, grade_icon_w, grade_icon_h), 3, GCornersAll);
@@ -772,19 +778,19 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   }
   graphics_context_set_compositing_mode(ctx, GCompOpSet);
   if (s_profile_weight_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(0, icon_y, weight_icon_w, weight_icon_h));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(weight_col_x, icon_y, weight_icon_w, weight_icon_h));
   }
   if (s_profile_terrain_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(weight_col_w, icon_y, terrain_icon_w, terrain_icon_h));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(terrain_col_x, icon_y, terrain_icon_w, terrain_icon_h));
   }
   if (s_profile_grade_icon) {
     graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(grade_col_x, icon_y, grade_icon_w, grade_icon_h));
   }
-  graphics_draw_text(ctx, weight_value, value_font, GRect(weight_icon_w + 2, y + value_y + 5, weight_col_w - (weight_icon_w + 2), 22),
+  graphics_draw_text(ctx, weight_value, value_font, GRect(weight_col_x + weight_icon_w + 2, y + value_y + 5, weight_col_w - (weight_icon_w + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, terrain_value, value_font, GRect(weight_col_w + terrain_icon_w + 2, y + value_y + 5, terrain_col_w - (terrain_icon_w + 2), 22),
+  graphics_draw_text(ctx, terrain_value, value_font, GRect(terrain_col_x + terrain_icon_w + 2, y + value_y + 5, terrain_col_w - (terrain_icon_w + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, grade_value, value_font, GRect(grade_col_x + grade_icon_w + 2, y + value_y + 5, row_w - (grade_col_x + grade_icon_w + 2), 22),
+  graphics_draw_text(ctx, grade_value, value_font, GRect(grade_col_x + grade_icon_w + 2, y + value_y + 5, grade_col_w - (grade_icon_w + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 }
 
@@ -869,11 +875,14 @@ static void prv_main_click_config_provider(void *context) {
 }
 
 static void prv_profile_window_load(Window *window) {
+  window_set_background_color(window, GColorBlack);
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
+  int16_t usable_height = bounds.size.h - (2 * SCREEN_PADDING);
+  s_profile_cell_height = usable_height / PROFILE_COUNT;
+  int16_t menu_height = s_profile_cell_height * PROFILE_COUNT;
   GRect menu_bounds = GRect(SCREEN_PADDING, SCREEN_PADDING,
-                            bounds.size.w - (2 * SCREEN_PADDING),
-                            bounds.size.h - (2 * SCREEN_PADDING));
+                            bounds.size.w - (2 * SCREEN_PADDING), menu_height);
   s_profile_menu_layer = menu_layer_create(menu_bounds);
   menu_layer_set_click_config_onto_window(s_profile_menu_layer, window);
   menu_layer_set_callbacks(s_profile_menu_layer, NULL, (MenuLayerCallbacks) {
@@ -883,6 +892,7 @@ static void prv_profile_window_load(Window *window) {
     .select_click = prv_profile_select_callback,
   });
   menu_layer_set_center_focused(s_profile_menu_layer, false);
+  menu_layer_pad_bottom_enable(s_profile_menu_layer, false);
   menu_layer_set_normal_colors(s_profile_menu_layer, GColorBlack, GColorWhite);
   menu_layer_set_highlight_colors(s_profile_menu_layer, GColorBlack, GColorWhite);
   s_profile_weight_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_WEIGHT);
