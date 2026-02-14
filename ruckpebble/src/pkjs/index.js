@@ -10,18 +10,18 @@
     stride_length_unit: 0,
 
     profile1_ruck_weight_value: 136,
-    profile1_terrain_factor: 150,
-    profile1_terrain_type: 'sand',
+    profile1_terrain_factor: 100,
+    profile1_terrain_type: 'road',
     profile1_grade_percent: 0,
-    profile1_name: 'Two Mabels, offroad',
+    profile1_name: '30lb, road',
 
     profile2_ruck_weight_value: 80,
     profile2_terrain_factor: 100,
-    profile2_terrain_type: 'road',
+    profile2_terrain_type: 'gravel',
     profile2_grade_percent: 0,
-    profile2_name: 'One Mabel, roads and tracks',
+    profile2_name: '15lb, trail',
 
-    profile3_ruck_weight_value: 120,
+    profile3_ruck_weight_value: 136,
     profile3_terrain_factor: 130,
     profile3_terrain_type: 'mixed',
     profile3_grade_percent: 0,
@@ -45,6 +45,27 @@
 
   function saveSettings(settings) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }
+
+  function normalizeSettings(settings) {
+    var out = Object.assign({}, defaults, settings || {});
+    out.profile1_terrain_type = terrainTypeFromSettings(out.profile1_terrain_type, out.profile1_terrain_factor);
+    out.profile2_terrain_type = terrainTypeFromSettings(out.profile2_terrain_type, out.profile2_terrain_factor);
+    out.profile3_terrain_type = terrainTypeFromSettings(out.profile3_terrain_type, out.profile3_terrain_factor);
+    out.profile1_terrain_factor = terrainFactorFromType(out.profile1_terrain_type);
+    out.profile2_terrain_factor = terrainFactorFromType(out.profile2_terrain_type);
+    out.profile3_terrain_factor = terrainFactorFromType(out.profile3_terrain_type);
+    return out;
+  }
+
+  function syncSettingsToWatch(settings) {
+    var normalized = normalizeSettings(settings);
+    saveSettings(normalized);
+    Pebble.sendAppMessage(normalized, function() {
+      console.log('initial/send settings success');
+    }, function(err) {
+      console.log('initial/send settings failed:', JSON.stringify(err));
+    });
   }
 
   function terrainFactorFromType(type) {
@@ -106,7 +127,9 @@
       'input,select{width:100%;padding:8px;font-size:14px;box-sizing:border-box;}' +
       '.row{display:flex;gap:8px;}.row>div{flex:1;}' +
       '.card{background:#fff;border-radius:8px;padding:12px;margin-top:10px;}' +
+      '.actions{display:flex;gap:8px;}' +
       'button{margin-top:16px;width:100%;padding:11px;font-size:16px;background:#111;color:#fff;border:0;border-radius:6px;}' +
+      '#reset_defaults{background:#666;}' +
       '</style></head><body>' +
       '<h1>Ruck Settings</h1>' +
 
@@ -142,9 +165,18 @@
       '<label class="icon-label"><span>Grade (%)</span><span class="icon-chip"><img src="' + gradeIcon + '" alt=""></span></label><input type="number" id="p3_grade_percent" step="0.1">' +
       '</div>' +
 
-      '<button id="save">Save</button>' +
+      '<div class="actions">' +
+      '<button id="reset_defaults" type="button">Reset to defaults</button>' +
+      '<button id="save" type="button">Save</button>' +
+      '</div>' +
       '<script>' +
       'function $(id){return document.getElementById(id);}' +
+      'function terrainTypeFromSettingsInner(type,factor){' +
+      'if(type==="road"||type==="gravel"||type==="mixed"||type==="sand"||type==="snow"){return type;}' +
+      'if(factor<=110){return "road";}' +
+      'if(factor<=125){return "gravel";}' +
+      'if(factor<=140){return "mixed";}' +
+      'return "sand";}' +
       'function updateRuckWeightLabels(){' +
       'var unit=($("ruck_weight_unit").value==="1")?"lb":"kg";' +
       '$("p1_ruck_weight_label").querySelector("span").textContent="Ruck weight ("+unit+")";' +
@@ -163,28 +195,33 @@
       'return m?decodeURIComponent(m[1]):"";' +
       '}' +
       'var s=' + JSON.stringify(s) + ';' +
-      '$("weight_value").value=(s.weight_value/10).toFixed(1);' +
-      '$("weight_unit").value=s.weight_unit;' +
-      '$("ruck_weight_unit").value=s.ruck_weight_unit;' +
-      '$("stride_length_value").value=(s.stride_length_value/10).toFixed(1);' +
-      '$("stride_length_unit").value=s.stride_length_unit;' +
-
-      '$("p1_ruck_weight_value").value=(s.profile1_ruck_weight_value/10).toFixed(1);' +
-      '$("p1_terrain_type").value=' + JSON.stringify(p1TerrainType) + ';' +
-      '$("p1_grade_percent").value=(s.profile1_grade_percent/10).toFixed(1);' +
-      '$("p1_name").value=s.profile1_name||"";' +
-
-      '$("p2_ruck_weight_value").value=(s.profile2_ruck_weight_value/10).toFixed(1);' +
-      '$("p2_terrain_type").value=' + JSON.stringify(p2TerrainType) + ';' +
-      '$("p2_grade_percent").value=(s.profile2_grade_percent/10).toFixed(1);' +
-      '$("p2_name").value=s.profile2_name||"";' +
-
-      '$("p3_ruck_weight_value").value=(s.profile3_ruck_weight_value/10).toFixed(1);' +
-      '$("p3_terrain_type").value=' + JSON.stringify(p3TerrainType) + ';' +
-      '$("p3_grade_percent").value=(s.profile3_grade_percent/10).toFixed(1);' +
-      '$("p3_name").value=s.profile3_name||"";' +
+      'var d=' + JSON.stringify(defaults) + ';' +
+      'function applyToForm(cfg){' +
+      '$("weight_value").value=(cfg.weight_value/10).toFixed(1);' +
+      '$("weight_unit").value=cfg.weight_unit;' +
+      '$("ruck_weight_unit").value=cfg.ruck_weight_unit;' +
+      '$("stride_length_value").value=(cfg.stride_length_value/10).toFixed(1);' +
+      '$("stride_length_unit").value=cfg.stride_length_unit;' +
+      '$("p1_ruck_weight_value").value=(cfg.profile1_ruck_weight_value/10).toFixed(1);' +
+      '$("p1_terrain_type").value=terrainTypeFromSettingsInner(cfg.profile1_terrain_type,cfg.profile1_terrain_factor);' +
+      '$("p1_grade_percent").value=(cfg.profile1_grade_percent/10).toFixed(1);' +
+      '$("p1_name").value=cfg.profile1_name||"";' +
+      '$("p2_ruck_weight_value").value=(cfg.profile2_ruck_weight_value/10).toFixed(1);' +
+      '$("p2_terrain_type").value=terrainTypeFromSettingsInner(cfg.profile2_terrain_type,cfg.profile2_terrain_factor);' +
+      '$("p2_grade_percent").value=(cfg.profile2_grade_percent/10).toFixed(1);' +
+      '$("p2_name").value=cfg.profile2_name||"";' +
+      '$("p3_ruck_weight_value").value=(cfg.profile3_ruck_weight_value/10).toFixed(1);' +
+      '$("p3_terrain_type").value=terrainTypeFromSettingsInner(cfg.profile3_terrain_type,cfg.profile3_terrain_factor);' +
+      '$("p3_grade_percent").value=(cfg.profile3_grade_percent/10).toFixed(1);' +
+      '$("p3_name").value=cfg.profile3_name||"";' +
       'updateRuckWeightLabels();' +
+      '}' +
+      'applyToForm(s);' +
       '$("ruck_weight_unit").addEventListener("change",updateRuckWeightLabels);' +
+      '$("reset_defaults").addEventListener("click",function(){' +
+      's=Object.assign({},d);' +
+      'applyToForm(s);' +
+      '});' +
 
       'document.getElementById("save").addEventListener("click",function(){' +
       'var out={' +
@@ -230,6 +267,11 @@
     openConfig();
   });
 
+  Pebble.addEventListener('ready', function() {
+    console.log('ready: syncing settings to watch');
+    syncSettingsToWatch(loadSettings());
+  });
+
   Pebble.addEventListener('webviewclosed', function(e) {
     if (!e || !e.response) {
       console.log('webviewclosed: no response payload');
@@ -249,11 +291,6 @@
       }
     }
     console.log('config parsed, sending to watch');
-    saveSettings(settings);
-    Pebble.sendAppMessage(settings, function() {
-      console.log('sendAppMessage success');
-    }, function(sendErr) {
-      console.log('sendAppMessage failed:', JSON.stringify(sendErr));
-    });
+    syncSettingsToWatch(settings);
   });
 })();

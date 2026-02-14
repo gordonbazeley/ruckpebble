@@ -43,22 +43,22 @@ static const Settings SETTINGS_DEFAULTS = {
   .ruck_weight_unit = 0,
   .stride_value = 780,
   .stride_unit = 0,
-  .sim_steps_enabled = 1,
+  .sim_steps_enabled = 0,
   .sim_steps_spm = 122,
   .active_profile = 0,
   .profiles = {
-    { .ruck_weight_value = 136, .terrain_factor = 200, .grade_percent = 0 },
-    { .ruck_weight_value = 80, .terrain_factor = 100, .grade_percent = 0 },
-    { .ruck_weight_value = 120, .terrain_factor = 150, .grade_percent = 0 }
+    { .ruck_weight_value = 136, .terrain_factor = 100, .grade_percent = 0 },
+    { .ruck_weight_value = 80, .terrain_factor = 120, .grade_percent = 0 },
+    { .ruck_weight_value = 136, .terrain_factor = 130, .grade_percent = 0 }
   },
   .profile_names = {
-    "Two Mabels, offroad",
-    "One Mabel, roads and tracks",
+    "30lb, road",
+    "15lb, trail",
     ""
   },
   .profile_terrain_types = {
-    "sand",
     "road",
+    "gravel",
     "mixed"
   }
 };
