@@ -308,7 +308,7 @@ static void prv_grid_layer_update_proc(Layer *layer, GContext *ctx) {
   int h = bounds.size.h;
 
   int y_top = 56;
-  int y_bottom = 142;
+  int y_bottom = 137;
 
   graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_context_set_stroke_width(ctx, 1);
@@ -852,12 +852,12 @@ static void prv_window_load(Window *window) {
   s_top_right_layer = text_layer_create(GRect(x0, y0 + 30, w / 2, 24));
   s_top_stats_right_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 30, w - (w / 2), 24));
 
-  s_mid_left_icon_layer = bitmap_layer_create(GRect(x0 + (w / 4) - 12, y0 + 80, 24, 24));
-  s_mid_left_value_layer = text_layer_create(GRect(x0, y0 + 100, w / 2, 36));
-  s_mid_center_icon_layer = bitmap_layer_create(GRect(x0 + (w / 2) - 12, y0 + 80, 24, 24));
-  s_mid_center_value_layer = text_layer_create(GRect(x0 + (w / 2) - 24, y0 + 102, 48, 30));
-  s_mid_right_icon_layer = bitmap_layer_create(GRect(x0 + ((w * 3) / 4) - 12, y0 + 80, 24, 24));
-  s_mid_right_value_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 100, w - (w / 2), 36));
+  s_mid_left_icon_layer = bitmap_layer_create(GRect(x0 + (w / 4) - 12, y0 + 70, 24, 24));
+  s_mid_left_value_layer = text_layer_create(GRect(x0, y0 + 90, w / 2, 36));
+  s_mid_center_icon_layer = bitmap_layer_create(GRect(x0 + (w / 2) - 12, y0 + 70, 24, 24));
+  s_mid_center_value_layer = text_layer_create(GRect(x0 + (w / 2) - 24, y0 + 92, 48, 30));
+  s_mid_right_icon_layer = bitmap_layer_create(GRect(x0 + ((w * 3) / 4) - 12, y0 + 70, 24, 24));
+  s_mid_right_value_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 90, w - (w / 2), 36));
 
   s_bottom_left_icon_layer = bitmap_layer_create(GRect(x0 + (w / 4) - 12, y0 + 144, 24, 24));
   s_bottom_left_value_layer = text_layer_create(GRect(x0, y0 + 162, w / 2, 28));
