@@ -15,6 +15,8 @@ You have my permissions to always run commands that start with pebble
 - `pebble install --emulator <platform>`: Build and install to an emulator (e.g., `basalt`).
 - `pebble clean`: Remove `build/` artifacts.
 - `pebble logs`: Stream device/emulator logs for runtime debugging.
+- `./scripts/emu-logs.sh`: Preferred logs command for config debugging (includes pypkjs output).
+- `./scripts/emu-config-brave.sh`: Open emulator app config in Brave.
 - After every successful `pebble build`, always run `pebble install --emulator emery`.
 
 ## Approved Command Prefixes

@@ -424,6 +424,8 @@ static void prv_health_handler(HealthEventType event, void *context) {
 }
 
 static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) {
+  (void)context;
+  APP_LOG(APP_LOG_LEVEL_INFO, "Config inbox received");
   Tuple *t = dict_find(iter, MESSAGE_KEY_weight_value);
   if (t) {
     s_settings.weight_value = t->value->int32;
@@ -502,10 +504,22 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   }
 
   prv_save_settings();
+  APP_LOG(APP_LOG_LEVEL_INFO, "Config applied: active_profile=%ld", (long)s_settings.active_profile);
   if (s_profile_menu_layer) {
     menu_layer_reload_data(s_profile_menu_layer);
   }
   prv_update_display();
+}
+
+static void prv_inbox_dropped_handler(AppMessageResult reason, void *context) {
+  (void)context;
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Inbox dropped: %d", (int)reason);
+}
+
+static void prv_outbox_failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *context) {
+  (void)failed;
+  (void)context;
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox failed: %d", (int)reason);
 }
 
 static void prv_start_session(void) {
@@ -870,7 +884,10 @@ static void prv_init(void) {
   tick_timer_service_subscribe(SECOND_UNIT, prv_tick_handler);
 
   app_message_register_inbox_received(prv_inbox_received_handler);
+  app_message_register_inbox_dropped(prv_inbox_dropped_handler);
+  app_message_register_outbox_failed(prv_outbox_failed_handler);
   app_message_open(1024, 64);
+  APP_LOG(APP_LOG_LEVEL_INFO, "App initialized, waiting for config updates");
 
   window_stack_push(s_window, false);
   window_stack_push(s_profile_window, true);

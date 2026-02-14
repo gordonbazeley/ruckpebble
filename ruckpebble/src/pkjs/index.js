@@ -102,6 +102,10 @@
       '<button id="save">Save</button>' +
       '<script>' +
       'function $(id){return document.getElementById(id);}' +
+      'function queryParam(name){' +
+      'var m=RegExp("[?&]"+name+"=([^&]*)").exec(location.search);' +
+      'return m?decodeURIComponent(m[1]):"";' +
+      '}' +
       'var s=' + JSON.stringify(s) + ';' +
       '$("weight_value").value=(s.weight_value/10).toFixed(1);' +
       '$("weight_unit").value=s.weight_unit;' +
@@ -154,7 +158,9 @@
       'sim_steps_spm: parseInt($("sim_steps_spm").value,10)' +
       '};' +
       'var payload=encodeURIComponent(JSON.stringify(out));' +
-      'document.location="pebblejs://close#"+payload;' +
+      'var ret=queryParam("return_to");' +
+      'if(ret){document.location=ret+payload;}' +
+      'else{document.location="pebblejs://close#"+payload;}' +
       '});' +
       '</script>' +
       '</body></html>';
@@ -163,11 +169,13 @@
   }
 
   Pebble.addEventListener('showConfiguration', function() {
+    console.log('showConfiguration event');
     openConfig();
   });
 
   Pebble.addEventListener('webviewclosed', function(e) {
     if (!e || !e.response) {
+      console.log('webviewclosed: no response payload');
       return;
     }
     var data = e.response;
@@ -175,9 +183,20 @@
     try {
       settings = JSON.parse(decodeURIComponent(data));
     } catch (err) {
-      return;
+      try {
+        // Some toolchains already hand us decoded JSON.
+        settings = JSON.parse(data);
+      } catch (fallbackErr) {
+        console.log('config parse failed:', String(err), String(fallbackErr));
+        return;
+      }
     }
+    console.log('config parsed, sending to watch');
     saveSettings(settings);
-    Pebble.sendAppMessage(settings);
+    Pebble.sendAppMessage(settings, function() {
+      console.log('sendAppMessage success');
+    }, function(sendErr) {
+      console.log('sendAppMessage failed:', JSON.stringify(sendErr));
+    });
   });
 })();
