@@ -16,8 +16,20 @@ You have my permissions to always run commands that start with pebble
 - `pebble clean`: Remove `build/` artifacts.
 - `pebble logs`: Stream device/emulator logs for runtime debugging.
 - `./scripts/emu-logs.sh`: Preferred logs command for config debugging (includes pypkjs output).
-- `./scripts/emu-config-brave.sh`: Open emulator app config in Brave.
+- `pebble emu-app-config --emulator emery`: Open emulator app config in the default browser (Safari).
 - After every successful `pebble build`, always run `pebble install --emulator emery`.
+
+## Runbook (Commands To Run)
+- Run emulator app:
+  - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
+  - `pebble build`
+  - `pebble install --emulator emery`
+- Open settings (Safari/default browser):
+  - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
+  - `pebble emu-app-config --emulator emery`
+- Review logs (watch + pkjs):
+  - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
+  - `./scripts/emu-logs.sh`
 
 ## Approved Command Prefixes
 - `pebble build`
@@ -26,11 +38,16 @@ You have my permissions to always run commands that start with pebble
 - `pebble emu-button back`
 - `pebble emu-button click back`
 - `pebble emu-button click select`
+- `pebble emu-app-config --emulator emery -vv`
+- `pebble emu-app-config --emulator emery`
 - `sleep 1`
+- `git -C ruckpebble add -A`
 - `git -C /Users/gordonbazeley/src/ruckpebble commit`
 - `git -C /Users/gordonbazeley/src/ruckpebble push origin main`
+- `git -C /Users/gordonbazeley/src/ruckpebble/ruckpebble push origin main`
 - `open -a Pebble`
 - `osascript -e 'tell application "System Events" to set frontmost of (first process whose unix id is 43798) to true'`
+- `/Users/gordonbazeley/src/ruckpebble/ruckpebble/scripts/emu-logs.sh`
 
 ## Coding Style & Naming Conventions
 - Language: C for watchapp logic; follow Pebble SDK APIs (`pebble.h`).
