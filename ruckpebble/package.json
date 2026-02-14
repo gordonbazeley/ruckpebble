@@ -67,7 +67,7 @@
         {
           "type": "png",
           "name": "ICON_WEIGHT",
-          "file": "icons/weight.png"
+          "file": "icons/weight_new.png"
         },
         {
           "type": "png",
@@ -77,7 +77,7 @@
         {
           "type": "png",
           "name": "ICON_GRADE",
-          "file": "icons/elevation.png"
+          "file": "icons/elevation_new.png"
         }
       ]
     }

@@ -565,8 +565,9 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   GRect bounds = layer_get_bounds((Layer *)cell_layer);
   const int16_t row_w = bounds.size.w;
   const int16_t row_h = bounds.size.h;
-  const int16_t value_y = row_h - 34;
-  const int16_t icon_size = 30;
+  const int16_t value_y = row_h - 32;
+  const int16_t icon_size = 24;
+  const int16_t icon_y = y + value_y + 2;
   const int16_t weight_col_w = row_w / 3;
   const int16_t terrain_col_w = row_w / 3;
   const int16_t grade_col_x = weight_col_w + terrain_col_w;
@@ -600,19 +601,19 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
 
   graphics_context_set_compositing_mode(ctx, GCompOpSet);
   if (s_profile_weight_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(0, y + value_y + 2, icon_size, icon_size));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(0, icon_y, icon_size, icon_size));
   }
   if (s_profile_terrain_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(weight_col_w, y + value_y + 2, icon_size, icon_size));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(weight_col_w, icon_y, icon_size, icon_size));
   }
   if (s_profile_grade_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(grade_col_x, y + value_y + 2, icon_size, icon_size));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(grade_col_x, icon_y, icon_size, icon_size));
   }
-  graphics_draw_text(ctx, weight_value, value_font, GRect(icon_size + 1, y + value_y + 5, weight_col_w - (icon_size + 1), 22),
+  graphics_draw_text(ctx, weight_value, value_font, GRect(icon_size + 2, y + value_y + 5, weight_col_w - (icon_size + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, terrain_value, value_font, GRect(weight_col_w + icon_size + 1, y + value_y + 5, terrain_col_w - (icon_size + 1), 22),
+  graphics_draw_text(ctx, terrain_value, value_font, GRect(weight_col_w + icon_size + 2, y + value_y + 5, terrain_col_w - (icon_size + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, grade_value, value_font, GRect(grade_col_x + icon_size + 1, y + value_y + 5, row_w - (grade_col_x + icon_size + 1), 22),
+  graphics_draw_text(ctx, grade_value, value_font, GRect(grade_col_x + icon_size + 2, y + value_y + 5, row_w - (grade_col_x + icon_size + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 }
 
