@@ -9,7 +9,9 @@
 
 #define PROFILE_COUNT 3
 #define PROFILE_NAME_MAX_LEN 33
+#define TERRAIN_TYPE_MAX_LEN 16
 #define SCREEN_PADDING 5
+#define PROFILE_ROW_HEIGHT 62
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -28,6 +30,7 @@ typedef struct {
   int32_t active_profile;     // 0..PROFILE_COUNT-1
   ProfileSettings profiles[PROFILE_COUNT];
   char profile_names[PROFILE_COUNT][PROFILE_NAME_MAX_LEN];
+  char profile_terrain_types[PROFILE_COUNT][TERRAIN_TYPE_MAX_LEN];
 } Settings;
 
 enum {
@@ -52,6 +55,11 @@ static const Settings SETTINGS_DEFAULTS = {
     "Two Mabels, offroad",
     "One Mabel, roads and tracks",
     ""
+  },
+  .profile_terrain_types = {
+    "sand",
+    "road",
+    "mixed"
   }
 };
 
@@ -130,14 +138,65 @@ static void prv_set_profile_name(int32_t profile_index, const char *name) {
   s_settings.profile_names[profile_index][PROFILE_NAME_MAX_LEN - 1] = '\0';
 }
 
-static const char *prv_terrain_label(int32_t terrain_factor_hundredths) {
-  if (terrain_factor_hundredths <= 120) {
+static int32_t prv_normalize_terrain_factor(int32_t terrain_factor_hundredths) {
+  if (terrain_factor_hundredths <= 110) {
+    return 100;
+  }
+  if (terrain_factor_hundredths <= 125) {
+    return 120;
+  }
+  if (terrain_factor_hundredths <= 140) {
+    return 130;
+  }
+  return 150;
+}
+
+static const char *prv_terrain_label_from_factor(int32_t terrain_factor_hundredths) {
+  int32_t normalized = prv_normalize_terrain_factor(terrain_factor_hundredths);
+  if (normalized == 100) {
     return "Road";
   }
-  if (terrain_factor_hundredths <= 170) {
+  if (normalized == 120) {
+    return "Gravel";
+  }
+  if (normalized == 130) {
     return "Mixed";
   }
-  return "Hilly";
+  return "Sand";
+}
+
+static void prv_set_profile_terrain_type(int32_t profile_index, const char *terrain_type) {
+  if (profile_index < 0 || profile_index >= PROFILE_COUNT) {
+    return;
+  }
+  if (!terrain_type || terrain_type[0] == '\0') {
+    s_settings.profile_terrain_types[profile_index][0] = '\0';
+    return;
+  }
+  strncpy(s_settings.profile_terrain_types[profile_index], terrain_type, TERRAIN_TYPE_MAX_LEN - 1);
+  s_settings.profile_terrain_types[profile_index][TERRAIN_TYPE_MAX_LEN - 1] = '\0';
+}
+
+static const char *prv_profile_terrain_label(int32_t profile_index, int32_t terrain_factor_hundredths) {
+  if (profile_index >= 0 && profile_index < PROFILE_COUNT) {
+    const char *terrain_type = s_settings.profile_terrain_types[profile_index];
+    if (strcmp(terrain_type, "road") == 0) {
+      return "Road";
+    }
+    if (strcmp(terrain_type, "gravel") == 0) {
+      return "Gravel";
+    }
+    if (strcmp(terrain_type, "mixed") == 0) {
+      return "Mixed";
+    }
+    if (strcmp(terrain_type, "sand") == 0) {
+      return "Sand";
+    }
+    if (strcmp(terrain_type, "snow") == 0) {
+      return "Snow";
+    }
+  }
+  return prv_terrain_label_from_factor(terrain_factor_hundredths);
 }
 
 static const char *prv_profile_display_name(int32_t row, char *fallback, size_t fallback_size) {
@@ -263,6 +322,20 @@ static void prv_load_settings(void) {
   s_settings = SETTINGS_DEFAULTS;
   if (persist_exists(SETTINGS_PERSIST_KEY)) {
     persist_read_data(SETTINGS_PERSIST_KEY, &s_settings, sizeof(s_settings));
+  }
+  for (int i = 0; i < PROFILE_COUNT; ++i) {
+    s_settings.profiles[i].terrain_factor = prv_normalize_terrain_factor(s_settings.profiles[i].terrain_factor);
+    if (s_settings.profile_terrain_types[i][0] == '\0') {
+      if (s_settings.profiles[i].terrain_factor == 100) {
+        prv_set_profile_terrain_type(i, "road");
+      } else if (s_settings.profiles[i].terrain_factor == 120) {
+        prv_set_profile_terrain_type(i, "gravel");
+      } else if (s_settings.profiles[i].terrain_factor == 130) {
+        prv_set_profile_terrain_type(i, "mixed");
+      } else {
+        prv_set_profile_terrain_type(i, "sand");
+      }
+    }
   }
 }
 
@@ -452,7 +525,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   }
   t = dict_find(iter, MESSAGE_KEY_profile1_terrain_factor);
   if (t) {
-    s_settings.profiles[0].terrain_factor = t->value->int32;
+    s_settings.profiles[0].terrain_factor = prv_normalize_terrain_factor(t->value->int32);
   }
   t = dict_find(iter, MESSAGE_KEY_profile1_grade_percent);
   if (t) {
@@ -464,7 +537,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   }
   t = dict_find(iter, MESSAGE_KEY_profile2_terrain_factor);
   if (t) {
-    s_settings.profiles[1].terrain_factor = t->value->int32;
+    s_settings.profiles[1].terrain_factor = prv_normalize_terrain_factor(t->value->int32);
   }
   t = dict_find(iter, MESSAGE_KEY_profile2_grade_percent);
   if (t) {
@@ -476,7 +549,19 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   }
   t = dict_find(iter, MESSAGE_KEY_profile3_terrain_factor);
   if (t) {
-    s_settings.profiles[2].terrain_factor = t->value->int32;
+    s_settings.profiles[2].terrain_factor = prv_normalize_terrain_factor(t->value->int32);
+  }
+  t = dict_find(iter, MESSAGE_KEY_profile1_terrain_type);
+  if (t) {
+    prv_set_profile_terrain_type(0, t->value->cstring);
+  }
+  t = dict_find(iter, MESSAGE_KEY_profile2_terrain_type);
+  if (t) {
+    prv_set_profile_terrain_type(1, t->value->cstring);
+  }
+  t = dict_find(iter, MESSAGE_KEY_profile3_terrain_type);
+  if (t) {
+    prv_set_profile_terrain_type(2, t->value->cstring);
   }
   t = dict_find(iter, MESSAGE_KEY_profile3_grade_percent);
   if (t) {
@@ -542,10 +627,10 @@ static uint16_t prv_profile_get_num_rows_callback(MenuLayer *menu_layer, uint16_
 }
 
 static int16_t prv_profile_get_cell_height_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *context) {
+  (void)menu_layer;
   (void)cell_index;
   (void)context;
-  GRect bounds = layer_get_bounds(menu_layer_get_layer(menu_layer));
-  return bounds.size.h / PROFILE_COUNT;
+  return PROFILE_ROW_HEIGHT;
 }
 
 static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *context) {
@@ -566,54 +651,67 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   const int16_t row_w = bounds.size.w;
   const int16_t row_h = bounds.size.h;
   const int16_t value_y = row_h - 32;
-  const int16_t icon_size = 24;
   const int16_t icon_y = y + value_y + 2;
   const int16_t weight_col_w = row_w / 3;
   const int16_t terrain_col_w = row_w / 3;
   const int16_t grade_col_x = weight_col_w + terrain_col_w;
+  const int16_t weight_icon_w = s_profile_weight_icon ? gbitmap_get_bounds(s_profile_weight_icon).size.w : 0;
+  const int16_t weight_icon_h = s_profile_weight_icon ? gbitmap_get_bounds(s_profile_weight_icon).size.h : 0;
+  const int16_t terrain_icon_w = s_profile_terrain_icon ? gbitmap_get_bounds(s_profile_terrain_icon).size.w : 0;
+  const int16_t terrain_icon_h = s_profile_terrain_icon ? gbitmap_get_bounds(s_profile_terrain_icon).size.h : 0;
+  const int16_t grade_icon_w = s_profile_grade_icon ? gbitmap_get_bounds(s_profile_grade_icon).size.w : 0;
+  const int16_t grade_icon_h = s_profile_grade_icon ? gbitmap_get_bounds(s_profile_grade_icon).size.h : 0;
   const GFont title_font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
   const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
   bool is_highlighted = menu_cell_layer_is_highlighted(cell_layer);
-  GColor bg = GColorBlack;
+  GColor bg = is_highlighted ? GColorWhite : GColorBlack;
+  GColor fg = is_highlighted ? GColorBlack : GColorWhite;
 
   title_text = prv_profile_display_name(row, legacy_title, sizeof(legacy_title));
   snprintf(weight_value, sizeof(weight_value), "%ld.%ld%s",
            (long)(p->ruck_weight_value / 10), (long)labs(p->ruck_weight_value % 10), weight_unit);
-  snprintf(terrain_value, sizeof(terrain_value), "%s", prv_terrain_label(p->terrain_factor));
+  snprintf(terrain_value, sizeof(terrain_value), "%s", prv_profile_terrain_label(row, p->terrain_factor));
   snprintf(grade_value, sizeof(grade_value), "%ld.%ld",
            (long)(p->grade_percent / 10), (long)labs(p->grade_percent % 10));
 
   graphics_context_set_fill_color(ctx, bg);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-  if (is_highlighted) {
-    // Draw a thicker selection frame so the active profile is unambiguous.
-    graphics_context_set_stroke_color(ctx, GColorWhite);
-    graphics_context_set_stroke_width(ctx, 2);
-    graphics_draw_rect(ctx, GRect(1, 1, row_w - 2, row_h - 2));
-  }
   if (row > 0) {
-    graphics_context_set_stroke_color(ctx, GColorDarkGray);
+    graphics_context_set_stroke_color(ctx, is_highlighted ? GColorLightGray : GColorDarkGray);
     graphics_draw_line(ctx, GPoint(0, 0), GPoint(row_w - 1, 0));
   }
-  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_context_set_text_color(ctx, fg);
   graphics_draw_text(ctx, title_text, title_font, GRect(0, y + 2, row_w, 24),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 
+  if (is_highlighted) {
+    // Keep icon contrast on the white selected row.
+    graphics_context_set_fill_color(ctx, GColorBlack);
+    if (s_profile_weight_icon) {
+      graphics_fill_rect(ctx, GRect(0, icon_y, weight_icon_w, weight_icon_h), 3, GCornersAll);
+    }
+    if (s_profile_terrain_icon) {
+      graphics_fill_rect(ctx, GRect(weight_col_w, icon_y, terrain_icon_w, terrain_icon_h), 3, GCornersAll);
+    }
+    if (s_profile_grade_icon) {
+      graphics_fill_rect(ctx, GRect(grade_col_x, icon_y, grade_icon_w, grade_icon_h), 3, GCornersAll);
+    }
+  }
   graphics_context_set_compositing_mode(ctx, GCompOpSet);
   if (s_profile_weight_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(0, icon_y, icon_size, icon_size));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_weight_icon, GRect(0, icon_y, weight_icon_w, weight_icon_h));
   }
   if (s_profile_terrain_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(weight_col_w, icon_y, icon_size, icon_size));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_terrain_icon, GRect(weight_col_w, icon_y, terrain_icon_w, terrain_icon_h));
   }
   if (s_profile_grade_icon) {
-    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(grade_col_x, icon_y, icon_size, icon_size));
+    graphics_draw_bitmap_in_rect(ctx, s_profile_grade_icon, GRect(grade_col_x, icon_y, grade_icon_w, grade_icon_h));
   }
-  graphics_draw_text(ctx, weight_value, value_font, GRect(icon_size + 2, y + value_y + 5, weight_col_w - (icon_size + 2), 22),
+  graphics_draw_text(ctx, weight_value, value_font, GRect(weight_icon_w + 2, y + value_y + 5, weight_col_w - (weight_icon_w + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, terrain_value, value_font, GRect(weight_col_w + icon_size + 2, y + value_y + 5, terrain_col_w - (icon_size + 2), 22),
+  graphics_draw_text(ctx, terrain_value, value_font, GRect(weight_col_w + terrain_icon_w + 2, y + value_y + 5, terrain_col_w - (terrain_icon_w + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, grade_value, value_font, GRect(grade_col_x + icon_size + 2, y + value_y + 5, row_w - (grade_col_x + icon_size + 2), 22),
+  graphics_draw_text(ctx, grade_value, value_font, GRect(grade_col_x + grade_icon_w + 2, y + value_y + 5, row_w - (grade_col_x + grade_icon_w + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 }
 
@@ -710,6 +808,7 @@ static void prv_profile_window_load(Window *window) {
     .draw_row = prv_profile_draw_row_callback,
     .select_click = prv_profile_select_callback,
   });
+  menu_layer_set_center_focused(s_profile_menu_layer, false);
   menu_layer_set_normal_colors(s_profile_menu_layer, GColorBlack, GColorWhite);
   menu_layer_set_highlight_colors(s_profile_menu_layer, GColorBlack, GColorWhite);
   s_profile_weight_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_WEIGHT);

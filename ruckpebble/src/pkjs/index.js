@@ -10,17 +10,20 @@
     stride_length_unit: 0,
 
     profile1_ruck_weight_value: 136,
-    profile1_terrain_factor: 200,
+    profile1_terrain_factor: 150,
+    profile1_terrain_type: 'sand',
     profile1_grade_percent: 0,
     profile1_name: 'Two Mabels, offroad',
 
     profile2_ruck_weight_value: 80,
     profile2_terrain_factor: 100,
+    profile2_terrain_type: 'road',
     profile2_grade_percent: 0,
     profile2_name: 'One Mabel, roads and tracks',
 
     profile3_ruck_weight_value: 120,
-    profile3_terrain_factor: 150,
+    profile3_terrain_factor: 130,
+    profile3_terrain_type: 'mixed',
     profile3_grade_percent: 0,
     profile3_name: '',
 
@@ -44,8 +47,48 @@
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }
 
+  function terrainFactorFromType(type) {
+    switch (type) {
+      case 'road': return 100;
+      case 'gravel': return 120;
+      case 'mixed': return 130;
+      case 'sand': return 150;
+      case 'snow': return 150;
+      default: return 130;
+    }
+  }
+
+  function terrainTypeFromSettings(type, factor) {
+    if (type === 'road' || type === 'gravel' || type === 'mixed' || type === 'sand' || type === 'snow') {
+      return type;
+    }
+    if (factor <= 110) {
+      return 'road';
+    }
+    if (factor <= 125) {
+      return 'gravel';
+    }
+    if (factor <= 140) {
+      return 'mixed';
+    }
+    return 'sand';
+  }
+
+  function terrainOptionsHtml() {
+    return '' +
+      '<option value="road">Road (1.0)</option>' +
+      '<option value="gravel">Gravel (1.2)</option>' +
+      '<option value="mixed">Mixed (1.3)</option>' +
+      '<option value="sand">Sand (1.5)</option>' +
+      '<option value="snow">Snow (1.5)</option>';
+  }
+
   function openConfig() {
     var s = loadSettings();
+    var p1TerrainType = terrainTypeFromSettings(s.profile1_terrain_type, s.profile1_terrain_factor);
+    var p2TerrainType = terrainTypeFromSettings(s.profile2_terrain_type, s.profile2_terrain_factor);
+    var p3TerrainType = terrainTypeFromSettings(s.profile3_terrain_type, s.profile3_terrain_factor);
+    var terrainOptions = terrainOptionsHtml();
     var html = '' +
       '<!doctype html><html><head><meta charset="utf-8">' +
       '<meta name="viewport" content="width=device-width,initial-scale=1">' +
@@ -74,34 +117,41 @@
 
       '<div class="card"><h2>Profile 1</h2>' +
       '<label>Profile name (optional)</label><input type="text" id="p1_name" maxlength="32">' +
-      '<label>Ruck weight</label><input type="number" id="p1_ruck_weight_value" step="0.1">' +
-      '<label>Terrain factor (μ)</label><input type="number" id="p1_terrain_factor" step="0.01">' +
+      '<label id="p1_ruck_weight_label">Ruck weight (kg)</label><input type="number" id="p1_ruck_weight_value" step="0.1">' +
+      '<label>Terrain</label><select id="p1_terrain_type">' + terrainOptions + '</select>' +
       '<label>Grade (%)</label><input type="number" id="p1_grade_percent" step="0.1">' +
       '</div>' +
 
       '<div class="card"><h2>Profile 2</h2>' +
       '<label>Profile name (optional)</label><input type="text" id="p2_name" maxlength="32">' +
-      '<label>Ruck weight</label><input type="number" id="p2_ruck_weight_value" step="0.1">' +
-      '<label>Terrain factor (μ)</label><input type="number" id="p2_terrain_factor" step="0.01">' +
+      '<label id="p2_ruck_weight_label">Ruck weight (kg)</label><input type="number" id="p2_ruck_weight_value" step="0.1">' +
+      '<label>Terrain</label><select id="p2_terrain_type">' + terrainOptions + '</select>' +
       '<label>Grade (%)</label><input type="number" id="p2_grade_percent" step="0.1">' +
       '</div>' +
 
       '<div class="card"><h2>Profile 3</h2>' +
       '<label>Profile name (optional)</label><input type="text" id="p3_name" maxlength="32">' +
-      '<label>Ruck weight</label><input type="number" id="p3_ruck_weight_value" step="0.1">' +
-      '<label>Terrain factor (μ)</label><input type="number" id="p3_terrain_factor" step="0.01">' +
+      '<label id="p3_ruck_weight_label">Ruck weight (kg)</label><input type="number" id="p3_ruck_weight_value" step="0.1">' +
+      '<label>Terrain</label><select id="p3_terrain_type">' + terrainOptions + '</select>' +
       '<label>Grade (%)</label><input type="number" id="p3_grade_percent" step="0.1">' +
-      '</div>' +
-
-      '<div class="card"><h2>Emulator</h2>' +
-      '<label>Simulated steps</label>' +
-      '<div class="row"><div><select id="sim_steps_enabled"><option value="0">Off</option><option value="1">On</option></select></div>' +
-      '<div><input type="number" id="sim_steps_spm" step="1"></div></div>' +
       '</div>' +
 
       '<button id="save">Save</button>' +
       '<script>' +
       'function $(id){return document.getElementById(id);}' +
+      'function updateRuckWeightLabels(){' +
+      'var unit=($("ruck_weight_unit").value==="1")?"lb":"kg";' +
+      '$("p1_ruck_weight_label").textContent="Ruck weight ("+unit+")";' +
+      '$("p2_ruck_weight_label").textContent="Ruck weight ("+unit+")";' +
+      '$("p3_ruck_weight_label").textContent="Ruck weight ("+unit+")";' +
+      '}' +
+      'function terrainFactorFromType(t){' +
+      'if(t==="road"){return 100;}' +
+      'if(t==="gravel"){return 120;}' +
+      'if(t==="mixed"){return 130;}' +
+      'if(t==="sand"){return 150;}' +
+      'if(t==="snow"){return 150;}' +
+      'return 130;}' +
       'function queryParam(name){' +
       'var m=RegExp("[?&]"+name+"=([^&]*)").exec(location.search);' +
       'return m?decodeURIComponent(m[1]):"";' +
@@ -114,22 +164,21 @@
       '$("stride_length_unit").value=s.stride_length_unit;' +
 
       '$("p1_ruck_weight_value").value=(s.profile1_ruck_weight_value/10).toFixed(1);' +
-      '$("p1_terrain_factor").value=(s.profile1_terrain_factor/100).toFixed(2);' +
+      '$("p1_terrain_type").value=' + JSON.stringify(p1TerrainType) + ';' +
       '$("p1_grade_percent").value=(s.profile1_grade_percent/10).toFixed(1);' +
       '$("p1_name").value=s.profile1_name||"";' +
 
       '$("p2_ruck_weight_value").value=(s.profile2_ruck_weight_value/10).toFixed(1);' +
-      '$("p2_terrain_factor").value=(s.profile2_terrain_factor/100).toFixed(2);' +
+      '$("p2_terrain_type").value=' + JSON.stringify(p2TerrainType) + ';' +
       '$("p2_grade_percent").value=(s.profile2_grade_percent/10).toFixed(1);' +
       '$("p2_name").value=s.profile2_name||"";' +
 
       '$("p3_ruck_weight_value").value=(s.profile3_ruck_weight_value/10).toFixed(1);' +
-      '$("p3_terrain_factor").value=(s.profile3_terrain_factor/100).toFixed(2);' +
+      '$("p3_terrain_type").value=' + JSON.stringify(p3TerrainType) + ';' +
       '$("p3_grade_percent").value=(s.profile3_grade_percent/10).toFixed(1);' +
       '$("p3_name").value=s.profile3_name||"";' +
-
-      '$("sim_steps_enabled").value=s.sim_steps_enabled;' +
-      '$("sim_steps_spm").value=s.sim_steps_spm;' +
+      'updateRuckWeightLabels();' +
+      '$("ruck_weight_unit").addEventListener("change",updateRuckWeightLabels);' +
 
       'document.getElementById("save").addEventListener("click",function(){' +
       'var out={' +
@@ -140,22 +189,24 @@
       'stride_length_unit: parseInt($("stride_length_unit").value,10),' +
 
       'profile1_ruck_weight_value: Math.round(parseFloat($("p1_ruck_weight_value").value||0)*10),' +
-      'profile1_terrain_factor: Math.round(parseFloat($("p1_terrain_factor").value||0)*100),' +
+      'profile1_terrain_type: $("p1_terrain_type").value,' +
+      'profile1_terrain_factor: terrainFactorFromType($("p1_terrain_type").value),' +
       'profile1_grade_percent: Math.round(parseFloat($("p1_grade_percent").value||0)*10),' +
       'profile1_name: ($("p1_name").value||"").trim().slice(0,32),' +
 
       'profile2_ruck_weight_value: Math.round(parseFloat($("p2_ruck_weight_value").value||0)*10),' +
-      'profile2_terrain_factor: Math.round(parseFloat($("p2_terrain_factor").value||0)*100),' +
+      'profile2_terrain_type: $("p2_terrain_type").value,' +
+      'profile2_terrain_factor: terrainFactorFromType($("p2_terrain_type").value),' +
       'profile2_grade_percent: Math.round(parseFloat($("p2_grade_percent").value||0)*10),' +
       'profile2_name: ($("p2_name").value||"").trim().slice(0,32),' +
 
       'profile3_ruck_weight_value: Math.round(parseFloat($("p3_ruck_weight_value").value||0)*10),' +
-      'profile3_terrain_factor: Math.round(parseFloat($("p3_terrain_factor").value||0)*100),' +
+      'profile3_terrain_type: $("p3_terrain_type").value,' +
+      'profile3_terrain_factor: terrainFactorFromType($("p3_terrain_type").value),' +
       'profile3_grade_percent: Math.round(parseFloat($("p3_grade_percent").value||0)*10),' +
       'profile3_name: ($("p3_name").value||"").trim().slice(0,32),' +
-
-      'sim_steps_enabled: parseInt($("sim_steps_enabled").value,10),' +
-      'sim_steps_spm: parseInt($("sim_steps_spm").value,10)' +
+      'sim_steps_enabled: 0,' +
+      'sim_steps_spm: (s.sim_steps_spm||122)' +
       '};' +
       'var payload=encodeURIComponent(JSON.stringify(out));' +
       'var ret=queryParam("return_to");' +

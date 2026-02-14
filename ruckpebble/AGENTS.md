@@ -27,6 +27,7 @@ You have my permissions to always run commands that start with pebble
 - Open settings (Safari/default browser):
   - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
   - `pebble emu-app-config --emulator emery`
+- When I say "rs" then run the emulator and settings
 - Review logs (watch + pkjs):
   - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
   - `./scripts/emu-logs.sh`

@@ -34,6 +34,9 @@
       "profile1_name",
       "profile2_name",
       "profile3_name",
+      "profile1_terrain_type",
+      "profile2_terrain_type",
+      "profile3_terrain_type",
       "sim_steps_enabled",
       "sim_steps_spm"
     ],
@@ -72,7 +75,7 @@
         {
           "type": "png",
           "name": "ICON_TERRAIN",
-          "file": "icons/map.png"
+          "file": "icons/map_new.png"
         },
         {
           "type": "png",
