@@ -43,11 +43,13 @@ You have my permissions to always run commands that start with pebble
 - `pebble emu-app-config --emulator emery`
 - `sleep 1`
 - `git -C ruckpebble add -A`
+- `git -C ruckpebble commit`
 - `git -C /Users/gordonbazeley/src/ruckpebble commit`
 - `git -C /Users/gordonbazeley/src/ruckpebble push origin main`
 - `git -C /Users/gordonbazeley/src/ruckpebble/ruckpebble push origin main`
 - `open -a Pebble`
 - `osascript -e 'tell application "System Events" to set frontmost of (first process whose unix id is 43798) to true'`
+- `./scripts/emu-logs.sh`
 - `/Users/gordonbazeley/src/ruckpebble/ruckpebble/scripts/emu-logs.sh`
 
 ## Coding Style & Naming Conventions
@@ -67,6 +69,7 @@ You have my permissions to always run commands that start with pebble
   * Stage all changed files
   * Add a useful commit message
   * git push origin
+- `origin` now points to `https://github.com/gordonbazeley/ruckpebble.git`.
 - Git history only shows “Initial …” commits; no formal convention established.
 - Use short, imperative summaries (e.g., “Add button handlers”).
 - PRs should include a clear description, affected platforms, and emulator screenshots for UI changes.

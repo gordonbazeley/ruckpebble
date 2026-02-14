@@ -37,6 +37,9 @@
       "profile1_terrain_type",
       "profile2_terrain_type",
       "profile3_terrain_type",
+      "request_lifetime_totals",
+      "lifetime_distance_m_total",
+      "lifetime_calories_total",
       "sim_steps_enabled",
       "sim_steps_spm"
     ],

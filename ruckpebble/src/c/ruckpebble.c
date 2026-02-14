@@ -34,7 +34,9 @@ typedef struct {
 } Settings;
 
 enum {
-  SETTINGS_PERSIST_KEY = 1
+  SETTINGS_PERSIST_KEY = 1,
+  LIFETIME_DISTANCE_M_PERSIST_KEY = 2,
+  LIFETIME_CALORIES_PERSIST_KEY = 3
 };
 
 static const Settings SETTINGS_DEFAULTS = {
@@ -102,6 +104,11 @@ static int32_t s_steps_baseline = 0;
 static int32_t s_last_steps = 0;
 static time_t s_last_time = 0;
 static int64_t s_speed_mmps = 0;
+static int32_t s_session_distance_m = 0;
+static int32_t s_session_calories = 0;
+static int32_t s_lifetime_distance_m = 0;
+static int32_t s_lifetime_calories = 0;
+static bool s_session_totals_committed = false;
 
 #define EMULATOR_TIME_SCALE 10
 
@@ -343,6 +350,49 @@ static void prv_save_settings(void) {
   persist_write_data(SETTINGS_PERSIST_KEY, &s_settings, sizeof(s_settings));
 }
 
+static void prv_send_lifetime_totals(void) {
+  DictionaryIterator *iter = NULL;
+  AppMessageResult result = app_message_outbox_begin(&iter);
+  if (result != APP_MSG_OK || !iter) {
+    APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox begin failed for totals: %d", (int)result);
+    return;
+  }
+  dict_write_int32(iter, MESSAGE_KEY_lifetime_distance_m_total, s_lifetime_distance_m);
+  dict_write_int32(iter, MESSAGE_KEY_lifetime_calories_total, s_lifetime_calories);
+  dict_write_end(iter);
+  result = app_message_outbox_send();
+  if (result != APP_MSG_OK) {
+    APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed for totals: %d", (int)result);
+  }
+}
+
+static void prv_commit_session_totals(const char *reason) {
+  if (s_session_totals_committed) {
+    return;
+  }
+  if (s_session_distance_m <= 0 && s_session_calories <= 0) {
+    s_session_totals_committed = true;
+    return;
+  }
+  int64_t lifetime_distance_m = (int64_t)s_lifetime_distance_m + s_session_distance_m;
+  int64_t lifetime_calories = (int64_t)s_lifetime_calories + s_session_calories;
+  if (lifetime_distance_m > INT32_MAX) {
+    lifetime_distance_m = INT32_MAX;
+  }
+  if (lifetime_calories > INT32_MAX) {
+    lifetime_calories = INT32_MAX;
+  }
+  s_lifetime_distance_m = (int32_t)lifetime_distance_m;
+  s_lifetime_calories = (int32_t)lifetime_calories;
+  persist_write_int(LIFETIME_DISTANCE_M_PERSIST_KEY, s_lifetime_distance_m);
+  persist_write_int(LIFETIME_CALORIES_PERSIST_KEY, s_lifetime_calories);
+  s_session_totals_committed = true;
+  APP_LOG(APP_LOG_LEVEL_INFO, "Session totals committed (%s): +%ld m +%ld kcal, lifetime=%ldm/%ldkcal",
+          reason ? reason : "n/a",
+          (long)s_session_distance_m, (long)s_session_calories,
+          (long)s_lifetime_distance_m, (long)s_lifetime_calories);
+}
+
 static void prv_update_display(void) {
   if (!s_top_time_layer) {
     return;
@@ -460,6 +510,22 @@ static void prv_update_display(void) {
   snprintf(steps_total_value_buf, sizeof(steps_total_value_buf), "%ld", (long)steps_total_day);
   snprintf(calories_value_buf, sizeof(calories_value_buf), "%ld", (long)ruck_kcal_total);
   snprintf(calories_walk_value_buf, sizeof(calories_walk_value_buf), "%ld", (long)walk_kcal_total);
+
+  int64_t session_distance_m = distance_mm / 1000;
+  if (session_distance_m < 0) {
+    session_distance_m = 0;
+  }
+  if (session_distance_m > INT32_MAX) {
+    session_distance_m = INT32_MAX;
+  }
+  s_session_distance_m = (int32_t)session_distance_m;
+  if (ruck_kcal_total < 0) {
+    ruck_kcal_total = 0;
+  }
+  if (ruck_kcal_total > INT32_MAX) {
+    ruck_kcal_total = INT32_MAX;
+  }
+  s_session_calories = (int32_t)ruck_kcal_total;
 
   if (health_service_metric_accessible(HealthMetricHeartRateBPM, now - 300, now)
       & HealthServiceAccessibilityMaskAvailable) {
@@ -587,6 +653,10 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   if (t) {
     s_settings.sim_steps_spm = t->value->int32;
   }
+  t = dict_find(iter, MESSAGE_KEY_request_lifetime_totals);
+  if (t && t->value->int32 == 1) {
+    prv_send_lifetime_totals();
+  }
 
   prv_save_settings();
   APP_LOG(APP_LOG_LEVEL_INFO, "Config applied: active_profile=%ld", (long)s_settings.active_profile);
@@ -612,6 +682,9 @@ static void prv_start_session(void) {
   s_last_time = 0;
   s_last_steps = 0;
   s_speed_mmps = 0;
+  s_session_distance_m = 0;
+  s_session_calories = 0;
+  s_session_totals_committed = false;
   if (s_health_available) {
     s_steps_baseline = (int32_t)health_service_sum(HealthMetricStepCount, s_day_start, s_start_time);
   } else {
@@ -731,6 +804,7 @@ static void prv_profile_select_callback(MenuLayer *menu_layer, MenuIndex *cell_i
 static void prv_main_back_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
+  prv_commit_session_totals("back");
   if (!window_stack_contains_window(s_profile_window)) {
     window_stack_push(s_profile_window, true);
   }
@@ -945,6 +1019,12 @@ static void prv_window_unload(Window *window) {
 
 static void prv_init(void) {
   prv_load_settings();
+  if (persist_exists(LIFETIME_DISTANCE_M_PERSIST_KEY)) {
+    s_lifetime_distance_m = persist_read_int(LIFETIME_DISTANCE_M_PERSIST_KEY);
+  }
+  if (persist_exists(LIFETIME_CALORIES_PERSIST_KEY)) {
+    s_lifetime_calories = persist_read_int(LIFETIME_CALORIES_PERSIST_KEY);
+  }
 
   s_window = window_create();
   window_set_window_handlers(s_window, (WindowHandlers) {
@@ -994,6 +1074,7 @@ static void prv_init(void) {
 }
 
 static void prv_deinit(void) {
+  prv_commit_session_totals("deinit");
   tick_timer_service_unsubscribe();
   if (s_health_available) {
     health_service_events_unsubscribe();

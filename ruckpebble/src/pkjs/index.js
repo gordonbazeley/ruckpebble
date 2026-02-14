@@ -26,10 +26,13 @@
     profile3_terrain_type: 'mixed',
     profile3_grade_percent: 0,
     profile3_name: '',
+    lifetime_distance_m_total: 0,
+    lifetime_calories_total: 0,
 
     sim_steps_enabled: 0,
     sim_steps_spm: 122
   };
+  var s_waitingLifetimeCallback = null;
 
   function loadSettings() {
     var raw = localStorage.getItem(SETTINGS_KEY);
@@ -55,6 +58,8 @@
     out.profile1_terrain_factor = terrainFactorFromType(out.profile1_terrain_type);
     out.profile2_terrain_factor = terrainFactorFromType(out.profile2_terrain_type);
     out.profile3_terrain_factor = terrainFactorFromType(out.profile3_terrain_type);
+    out.lifetime_distance_m_total = parseInt(out.lifetime_distance_m_total, 10) || 0;
+    out.lifetime_calories_total = parseInt(out.lifetime_calories_total, 10) || 0;
     return out;
   }
 
@@ -104,6 +109,27 @@
       '<option value="snow">Snow (1.5)</option>';
   }
 
+  function requestLifetimeTotals(onComplete) {
+    var done = false;
+    function finish() {
+      if (done) {
+        return;
+      }
+      done = true;
+      s_waitingLifetimeCallback = null;
+      if (onComplete) {
+        onComplete();
+      }
+    }
+    s_waitingLifetimeCallback = finish;
+    Pebble.sendAppMessage({ request_lifetime_totals: 1 }, function() {
+      // Allow a brief window for appmessage payload to arrive before opening config.
+      setTimeout(finish, 250);
+    }, function() {
+      finish();
+    });
+  }
+
   function openConfig() {
     var s = loadSettings();
     var p1TerrainType = terrainTypeFromSettings(s.profile1_terrain_type, s.profile1_terrain_factor);
@@ -128,8 +154,9 @@
       '.row{display:flex;gap:8px;}.row>div{flex:1;}' +
       '.card{background:#fff;border-radius:8px;padding:12px;margin-top:10px;}' +
       '.actions{display:flex;gap:8px;}' +
-      'button{margin-top:16px;width:100%;padding:11px;font-size:16px;background:#111;color:#fff;border:0;border-radius:6px;}' +
-      '#reset_defaults{background:#666;}' +
+      '.actions button{margin-top:16px;padding:11px;font-size:16px;color:#fff;border:0;border-radius:6px;}' +
+      '#save{flex:2;background:#111;}' +
+      '#reset_defaults{flex:1;background:#666;}' +
       '</style></head><body>' +
       '<h1>Ruck Settings</h1>' +
 
@@ -165,9 +192,14 @@
       '<label class="icon-label"><span>Grade (%)</span><span class="icon-chip"><img src="' + gradeIcon + '" alt=""></span></label><input type="number" id="p3_grade_percent" step="0.1">' +
       '</div>' +
 
+      '<div class="card"><h2>Tracked Totals</h2>' +
+      '<label>Lifetime distance (app, km)</label><input type="text" id="lifetime_distance_km_total" readonly>' +
+      '<label>Lifetime calories (app)</label><input type="text" id="lifetime_calories_total" readonly>' +
+      '</div>' +
+
       '<div class="actions">' +
-      '<button id="reset_defaults" type="button">Reset to defaults</button>' +
       '<button id="save" type="button">Save</button>' +
+      '<button id="reset_defaults" type="button">Reset</button>' +
       '</div>' +
       '<script>' +
       'function $(id){return document.getElementById(id);}' +
@@ -194,6 +226,12 @@
       'var m=RegExp("[?&]"+name+"=([^&]*)").exec(location.search);' +
       'return m?decodeURIComponent(m[1]):"";' +
       '}' +
+      'function formatNumber(n){return String(parseInt(n,10)||0);}' +
+      'function formatKmFromMeters(m){' +
+      'var n=parseInt(m,10)||0;' +
+      'var km100=Math.round(n/10);' +
+      'return String(Math.floor(km100/100))+"."+("0"+(km100%100)).slice(-2);' +
+      '}' +
       'var s=' + JSON.stringify(s) + ';' +
       'var d=' + JSON.stringify(defaults) + ';' +
       'function applyToForm(cfg){' +
@@ -214,6 +252,8 @@
       '$("p3_terrain_type").value=terrainTypeFromSettingsInner(cfg.profile3_terrain_type,cfg.profile3_terrain_factor);' +
       '$("p3_grade_percent").value=(cfg.profile3_grade_percent/10).toFixed(1);' +
       '$("p3_name").value=cfg.profile3_name||"";' +
+      '$("lifetime_distance_km_total").value=formatKmFromMeters(cfg.lifetime_distance_m_total);' +
+      '$("lifetime_calories_total").value=formatNumber(cfg.lifetime_calories_total);' +
       'updateRuckWeightLabels();' +
       '}' +
       'applyToForm(s);' +
@@ -248,6 +288,8 @@
       'profile3_terrain_factor: terrainFactorFromType($("p3_terrain_type").value),' +
       'profile3_grade_percent: Math.round(parseFloat($("p3_grade_percent").value||0)*10),' +
       'profile3_name: ($("p3_name").value||"").trim().slice(0,32),' +
+      'lifetime_distance_m_total: (s.lifetime_distance_m_total||0),' +
+      'lifetime_calories_total: parseInt($("lifetime_calories_total").value,10)||0,' +
       'sim_steps_enabled: 0,' +
       'sim_steps_spm: (s.sim_steps_spm||122)' +
       '};' +
@@ -264,12 +306,32 @@
 
   Pebble.addEventListener('showConfiguration', function() {
     console.log('showConfiguration event');
-    openConfig();
+    requestLifetimeTotals(function() {
+      openConfig();
+    });
   });
 
   Pebble.addEventListener('ready', function() {
     console.log('ready: syncing settings to watch');
     syncSettingsToWatch(loadSettings());
+    requestLifetimeTotals();
+  });
+
+  Pebble.addEventListener('appmessage', function(e) {
+    var payload = (e && e.payload) ? e.payload : {};
+    if (typeof payload.lifetime_distance_m_total === 'number' || typeof payload.lifetime_calories_total === 'number') {
+      var s = loadSettings();
+      if (typeof payload.lifetime_distance_m_total === 'number') {
+        s.lifetime_distance_m_total = payload.lifetime_distance_m_total;
+      }
+      if (typeof payload.lifetime_calories_total === 'number') {
+        s.lifetime_calories_total = payload.lifetime_calories_total;
+      }
+      saveSettings(normalizeSettings(s));
+      if (s_waitingLifetimeCallback) {
+        s_waitingLifetimeCallback();
+      }
+    }
   });
 
   Pebble.addEventListener('webviewclosed', function(e) {
