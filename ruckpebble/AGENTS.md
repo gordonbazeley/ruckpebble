@@ -20,6 +20,7 @@ You have my permissions to always run commands that start with pebble
 - After every successful `pebble build`, always run `pebble install --emulator emery`.
 
 ## Runbook (Commands To Run)
+- "rs" - run the emulator and settings
 - Run emulator app:
   - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
   - `pebble build`
@@ -27,7 +28,6 @@ You have my permissions to always run commands that start with pebble
 - Open settings (Safari/default browser):
   - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
   - `pebble emu-app-config --emulator emery`
-- When I say "rs" then run the emulator and settings
 - Review logs (watch + pkjs):
   - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
   - `./scripts/emu-logs.sh`
@@ -54,6 +54,12 @@ You have my permissions to always run commands that start with pebble
 - `osascript -e 'tell application "System Events" to set frontmost of (first process whose unix id is 43798) to true'`
 - `./scripts/emu-logs.sh`
 - `/Users/gordonbazeley/src/ruckpebble/ruckpebble/scripts/emu-logs.sh`
+- `/bin/bash -lc "pebble emu-button --emulator emery click down; pebble emu-button --emulator emery click down; pebble emu-button --emulator emery click select; sleep 1; pebble emu-button --emulator emery click back; sleep 1; pebble emu-button --emulator emery click down; pebble emu-button --emulator emery click down; pebble screenshot /tmp/emu_profile_return_third.png"`
+- `/bin/bash -lc "pebble emu-button --emulator emery click back; sleep 1; pebble screenshot /tmp/emu_after_profile_back_exit.png"`
+- `/bin/bash -lc "pebble emu-button --emulator emery click back; sleep 1; pebble emu-button --emulator emery click back; sleep 1; pebble screenshot /tmp/emu_after_two_backs.png"`
+- `/bin/bash -lc "pebble emu-button click back; sleep 1; pebble screenshot /tmp/emu_profile_after_back_test1.png; pebble emu-button click back; sleep 1; pebble screenshot /tmp/emu_profile_after_back_test2.png"`
+- `/bin/bash -lc "pebble emu-button click select; sleep 1; pebble emu-button click back; sleep 1; pebble emu-button click down; pebble emu-button click down; pebble screenshot /tmp/emu_return_profile_third_noshift3.png"`
+- `/bin/bash -lc "pebble emu-button click select; sleep 1; pebble emu-button click back; sleep 1; pebble emu-button click down; pebble emu-button click down; pebble screenshot /tmp/emu_return_profile_third_simplified.png"`
 
 ## Coding Style & Naming Conventions
 - Language: C for watchapp logic; follow Pebble SDK APIs (`pebble.h`).
