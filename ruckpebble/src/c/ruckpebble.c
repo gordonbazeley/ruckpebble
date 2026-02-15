@@ -826,14 +826,12 @@ static void prv_profile_up_click_handler(ClickRecognizerRef recognizer, void *co
   (void)recognizer;
   (void)context;
   menu_layer_set_selected_next(s_profile_menu_layer, true, MenuRowAlignNone, false);
-  prv_profile_reset_scroll_offset();
 }
 
 static void prv_profile_down_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
   menu_layer_set_selected_next(s_profile_menu_layer, false, MenuRowAlignNone, false);
-  prv_profile_reset_scroll_offset();
 }
 
 static void prv_profile_select_click_handler(ClickRecognizerRef recognizer, void *context) {
