@@ -33,6 +33,7 @@ You have my permissions to always run commands that start with pebble
   - `./scripts/emu-logs.sh`
 
 ## Approved Command Prefixes
+- `pebble`
 - `pebble build`
 - `pebble install --emulator emery`
 - `pebble screenshot` (any output path/filename)
@@ -45,6 +46,8 @@ You have my permissions to always run commands that start with pebble
 - `git -C ruckpebble add -A`
 - `git -C ruckpebble commit`
 - `git -C /Users/gordonbazeley/src/ruckpebble commit`
+- `git -C /Users/gordonbazeley/src/ruckpebble/ruckpebble add -A`
+- `git -C /Users/gordonbazeley/src/ruckpebble/ruckpebble commit`
 - `git -C /Users/gordonbazeley/src/ruckpebble push origin main`
 - `git -C /Users/gordonbazeley/src/ruckpebble/ruckpebble push origin main`
 - `open -a Pebble`

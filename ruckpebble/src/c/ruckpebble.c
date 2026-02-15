@@ -12,6 +12,7 @@
 #define TERRAIN_TYPE_MAX_LEN 16
 #define SCREEN_PADDING 5
 #define PROFILE_ROW_HEIGHT 62
+#define PROFILE_ROW_SEPARATOR_HEIGHT 1
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -807,6 +808,49 @@ static void prv_profile_select_callback(MenuLayer *menu_layer, MenuIndex *cell_i
   prv_update_display();
 }
 
+static void prv_profile_back_click_handler(ClickRecognizerRef recognizer, void *context) {
+  (void)recognizer;
+  (void)context;
+  window_stack_pop_all(true);
+}
+
+static void prv_profile_reset_scroll_offset(void) {
+  if (!s_profile_menu_layer) {
+    return;
+  }
+  ScrollLayer *scroll_layer = menu_layer_get_scroll_layer(s_profile_menu_layer);
+  scroll_layer_set_content_offset(scroll_layer, GPoint(0, 0), false);
+}
+
+static void prv_profile_up_click_handler(ClickRecognizerRef recognizer, void *context) {
+  (void)recognizer;
+  (void)context;
+  menu_layer_set_selected_next(s_profile_menu_layer, true, MenuRowAlignNone, false);
+  prv_profile_reset_scroll_offset();
+}
+
+static void prv_profile_down_click_handler(ClickRecognizerRef recognizer, void *context) {
+  (void)recognizer;
+  (void)context;
+  menu_layer_set_selected_next(s_profile_menu_layer, false, MenuRowAlignNone, false);
+  prv_profile_reset_scroll_offset();
+}
+
+static void prv_profile_select_click_handler(ClickRecognizerRef recognizer, void *context) {
+  (void)recognizer;
+  (void)context;
+  MenuIndex selected = menu_layer_get_selected_index(s_profile_menu_layer);
+  prv_profile_select_callback(s_profile_menu_layer, &selected, NULL);
+}
+
+static void prv_profile_click_config_provider(void *context) {
+  (void)context;
+  window_single_click_subscribe(BUTTON_ID_BACK, prv_profile_back_click_handler);
+  window_single_click_subscribe(BUTTON_ID_UP, prv_profile_up_click_handler);
+  window_single_click_subscribe(BUTTON_ID_DOWN, prv_profile_down_click_handler);
+  window_single_click_subscribe(BUTTON_ID_SELECT, prv_profile_select_click_handler);
+}
+
 static void prv_main_back_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
@@ -879,12 +923,11 @@ static void prv_profile_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
   int16_t usable_height = bounds.size.h - (2 * SCREEN_PADDING);
-  s_profile_cell_height = usable_height / PROFILE_COUNT;
-  int16_t menu_height = s_profile_cell_height * PROFILE_COUNT;
+  s_profile_cell_height = (usable_height - ((PROFILE_COUNT - 1) * PROFILE_ROW_SEPARATOR_HEIGHT)) / PROFILE_COUNT;
+  int16_t menu_height = usable_height;
   GRect menu_bounds = GRect(SCREEN_PADDING, SCREEN_PADDING,
                             bounds.size.w - (2 * SCREEN_PADDING), menu_height);
   s_profile_menu_layer = menu_layer_create(menu_bounds);
-  menu_layer_set_click_config_onto_window(s_profile_menu_layer, window);
   menu_layer_set_callbacks(s_profile_menu_layer, NULL, (MenuLayerCallbacks) {
     .get_num_rows = prv_profile_get_num_rows_callback,
     .get_cell_height = prv_profile_get_cell_height_callback,
@@ -899,7 +942,8 @@ static void prv_profile_window_load(Window *window) {
   s_profile_terrain_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_TERRAIN);
   s_profile_grade_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_GRADE);
   menu_layer_set_selected_index(s_profile_menu_layer, (MenuIndex) { .section = 0, .row = prv_active_profile_index() },
-                                MenuRowAlignCenter, false);
+                                MenuRowAlignNone, false);
+  prv_profile_reset_scroll_offset();
   layer_add_child(window_layer, menu_layer_get_layer(s_profile_menu_layer));
 }
 
@@ -1043,6 +1087,7 @@ static void prv_init(void) {
   });
 
   s_profile_window = window_create();
+  window_set_click_config_provider(s_profile_window, prv_profile_click_config_provider);
   window_set_window_handlers(s_profile_window, (WindowHandlers) {
     .load = prv_profile_window_load,
     .unload = prv_profile_window_unload,
