@@ -7,6 +7,26 @@
 #define MESSAGE_KEY_sim_steps_spm 9
 #endif
 
+// Keep builds compatible when package messageKeys are stale/missing in some environments.
+#ifndef MESSAGE_KEY_profile1_terrain_type
+#define MESSAGE_KEY_profile1_terrain_type 0x7FFFFFF0
+#endif
+#ifndef MESSAGE_KEY_profile2_terrain_type
+#define MESSAGE_KEY_profile2_terrain_type 0x7FFFFFF1
+#endif
+#ifndef MESSAGE_KEY_profile3_terrain_type
+#define MESSAGE_KEY_profile3_terrain_type 0x7FFFFFF2
+#endif
+#ifndef MESSAGE_KEY_request_lifetime_totals
+#define MESSAGE_KEY_request_lifetime_totals 0x7FFFFFF3
+#endif
+#ifndef MESSAGE_KEY_lifetime_distance_m_total
+#define MESSAGE_KEY_lifetime_distance_m_total 0x7FFFFFF4
+#endif
+#ifndef MESSAGE_KEY_lifetime_calories_total
+#define MESSAGE_KEY_lifetime_calories_total 0x7FFFFFF5
+#endif
+
 #define PROFILE_COUNT 3
 #define PROFILE_NAME_MAX_LEN 33
 #define TERRAIN_TYPE_MAX_LEN 16
