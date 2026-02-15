@@ -13,6 +13,8 @@
 #define SCREEN_PADDING 5
 #define PROFILE_ROW_HEIGHT 62
 #define PROFILE_ROW_SEPARATOR_HEIGHT 1
+#define PROFILE_GRADE_TEXT_WIDTH 24
+#define PROFILE_TERRAIN_BONUS_WIDTH 8
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -729,18 +731,19 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   const int16_t content_w = row_w - (2 * SCREEN_PADDING);
   const int16_t value_y = row_h - 32;
   const int16_t icon_y = y + value_y + 2;
-  const int16_t weight_col_x = content_x;
-  const int16_t weight_col_w = content_w / 3;
-  const int16_t terrain_col_x = weight_col_x + weight_col_w;
-  const int16_t terrain_col_w = content_w / 3;
-  const int16_t grade_col_x = terrain_col_x + terrain_col_w;
-  const int16_t grade_col_w = content_w - (weight_col_w + terrain_col_w);
   const int16_t weight_icon_w = s_profile_weight_icon ? gbitmap_get_bounds(s_profile_weight_icon).size.w : 0;
   const int16_t weight_icon_h = s_profile_weight_icon ? gbitmap_get_bounds(s_profile_weight_icon).size.h : 0;
   const int16_t terrain_icon_w = s_profile_terrain_icon ? gbitmap_get_bounds(s_profile_terrain_icon).size.w : 0;
   const int16_t terrain_icon_h = s_profile_terrain_icon ? gbitmap_get_bounds(s_profile_terrain_icon).size.h : 0;
   const int16_t grade_icon_w = s_profile_grade_icon ? gbitmap_get_bounds(s_profile_grade_icon).size.w : 0;
   const int16_t grade_icon_h = s_profile_grade_icon ? gbitmap_get_bounds(s_profile_grade_icon).size.h : 0;
+  const int16_t grade_col_w = grade_icon_w + 2 + PROFILE_GRADE_TEXT_WIDTH;
+  const int16_t remaining_w = content_w - grade_col_w;
+  const int16_t weight_col_x = content_x;
+  const int16_t weight_col_w = (remaining_w / 2) - (PROFILE_TERRAIN_BONUS_WIDTH / 2);
+  const int16_t terrain_col_x = weight_col_x + weight_col_w;
+  const int16_t terrain_col_w = remaining_w - weight_col_w;
+  const int16_t grade_col_x = terrain_col_x + terrain_col_w;
   const GFont title_font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
   const GFont value_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
   bool is_highlighted = menu_cell_layer_is_highlighted(cell_layer);
@@ -792,7 +795,7 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   graphics_draw_text(ctx, terrain_value, value_font, GRect(terrain_col_x + terrain_icon_w + 2, y + value_y + 5, terrain_col_w - (terrain_icon_w + 2), 22),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
   graphics_draw_text(ctx, grade_value, value_font, GRect(grade_col_x + grade_icon_w + 2, y + value_y + 5, grade_col_w - (grade_icon_w + 2), 22),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
 }
 
 static void prv_profile_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *context) {
