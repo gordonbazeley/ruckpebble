@@ -45,20 +45,20 @@ enum {
 static const Settings SETTINGS_DEFAULTS = {
   .weight_value = 800,
   .weight_unit = 0,
-  .ruck_weight_unit = 0,
+  .ruck_weight_unit = 1,
   .stride_value = 780,
   .stride_unit = 0,
-  .sim_steps_enabled = 0,
+  .sim_steps_enabled = 1,
   .sim_steps_spm = 122,
   .active_profile = 0,
   .profiles = {
-    { .ruck_weight_value = 136, .terrain_factor = 100, .grade_percent = 0 },
-    { .ruck_weight_value = 80, .terrain_factor = 120, .grade_percent = 0 },
-    { .ruck_weight_value = 136, .terrain_factor = 130, .grade_percent = 0 }
+    { .ruck_weight_value = 300, .terrain_factor = 100, .grade_percent = 0 },
+    { .ruck_weight_value = 150, .terrain_factor = 120, .grade_percent = 10 },
+    { .ruck_weight_value = 300, .terrain_factor = 130, .grade_percent = 0 }
   },
   .profile_names = {
     "30lb, road",
-    "15lb, trail",
+    "15lb, trail, hilly",
     ""
   },
   .profile_terrain_types = {
@@ -754,8 +754,8 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   snprintf(weight_value, sizeof(weight_value), "%ld.%ld%s",
            (long)(p->ruck_weight_value / 10), (long)labs(p->ruck_weight_value % 10), weight_unit);
   snprintf(terrain_value, sizeof(terrain_value), "%s", prv_profile_terrain_label(row, p->terrain_factor));
-  snprintf(grade_value, sizeof(grade_value), "%ld.%ld",
-           (long)(p->grade_percent / 10), (long)labs(p->grade_percent % 10));
+  int32_t grade_int = (p->grade_percent >= 0) ? ((p->grade_percent + 5) / 10) : ((p->grade_percent - 5) / 10);
+  snprintf(grade_value, sizeof(grade_value), "%ld%%", (long)grade_int);
 
   graphics_context_set_fill_color(ctx, bg);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
