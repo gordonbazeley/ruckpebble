@@ -312,6 +312,10 @@
       'profile3_name: ($("p3_name").value||"").trim().slice(0,32),' +
       'lifetime_distance_m_total: (s.lifetime_distance_m_total||0),' +
       'lifetime_calories_total: parseInt($("lifetime_calories_total").value,10)||0,' +
+      'last_activity_distance_m: (s.last_activity_distance_m||0),' +
+      'last_activity_calories: (s.last_activity_calories||0),' +
+      'last_activity_pace_sec: (s.last_activity_pace_sec||0),' +
+      'last_activity_timestamp: (s.last_activity_timestamp||0),' +
       'sim_steps_enabled: (s.sim_steps_enabled?1:0),' +
       'sim_steps_spm: (s.sim_steps_spm||122)' +
       '};' +
