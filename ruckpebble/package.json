@@ -40,6 +40,10 @@
       "request_lifetime_totals",
       "lifetime_distance_m_total",
       "lifetime_calories_total",
+      "last_activity_distance_m",
+      "last_activity_calories",
+      "last_activity_pace_sec",
+      "last_activity_timestamp",
       "sim_steps_enabled",
       "sim_steps_spm"
     ],

@@ -26,6 +26,18 @@
 #ifndef MESSAGE_KEY_lifetime_calories_total
 #define MESSAGE_KEY_lifetime_calories_total 0x7FFFFFF5
 #endif
+#ifndef MESSAGE_KEY_last_activity_distance_m
+#define MESSAGE_KEY_last_activity_distance_m 0x7FFFFFE0
+#endif
+#ifndef MESSAGE_KEY_last_activity_calories
+#define MESSAGE_KEY_last_activity_calories 0x7FFFFFE1
+#endif
+#ifndef MESSAGE_KEY_last_activity_pace_sec
+#define MESSAGE_KEY_last_activity_pace_sec 0x7FFFFFE2
+#endif
+#ifndef MESSAGE_KEY_last_activity_timestamp
+#define MESSAGE_KEY_last_activity_timestamp 0x7FFFFFE3
+#endif
 
 #define PROFILE_COUNT 3
 #define PROFILE_NAME_MAX_LEN 33
@@ -59,7 +71,11 @@ typedef struct {
 enum {
   SETTINGS_PERSIST_KEY = 1,
   LIFETIME_DISTANCE_M_PERSIST_KEY = 2,
-  LIFETIME_CALORIES_PERSIST_KEY = 3
+  LIFETIME_CALORIES_PERSIST_KEY = 3,
+  LAST_ACTIVITY_DISTANCE_M_PERSIST_KEY = 4,
+  LAST_ACTIVITY_CALORIES_PERSIST_KEY   = 5,
+  LAST_ACTIVITY_PACE_SEC_PERSIST_KEY   = 6,
+  LAST_ACTIVITY_TIMESTAMP_PERSIST_KEY  = 7
 };
 
 static const Settings SETTINGS_DEFAULTS = {
@@ -133,6 +149,11 @@ static int32_t s_session_calories = 0;
 static int32_t s_lifetime_distance_m = 0;
 static int32_t s_lifetime_calories = 0;
 static bool s_session_totals_committed = false;
+static int32_t s_last_activity_distance_m = 0;
+static int32_t s_last_activity_calories   = 0;
+static int32_t s_last_activity_pace_sec   = 0;
+static int32_t s_last_activity_timestamp  = 0;
+static int32_t s_session_pace_sec         = 0;
 
 #define EMULATOR_TIME_SCALE 10
 
@@ -383,6 +404,10 @@ static void prv_send_lifetime_totals(void) {
   }
   dict_write_int32(iter, MESSAGE_KEY_lifetime_distance_m_total, s_lifetime_distance_m);
   dict_write_int32(iter, MESSAGE_KEY_lifetime_calories_total, s_lifetime_calories);
+  dict_write_int32(iter, MESSAGE_KEY_last_activity_distance_m, s_last_activity_distance_m);
+  dict_write_int32(iter, MESSAGE_KEY_last_activity_calories,   s_last_activity_calories);
+  dict_write_int32(iter, MESSAGE_KEY_last_activity_pace_sec,   s_last_activity_pace_sec);
+  dict_write_int32(iter, MESSAGE_KEY_last_activity_timestamp,  s_last_activity_timestamp);
   dict_write_end(iter);
   result = app_message_outbox_send();
   if (result != APP_MSG_OK) {
@@ -487,6 +512,10 @@ static void prv_update_display(void) {
   int64_t pace_sec = 0;
   if (distance_mm > 0) {
     pace_sec = (elapsed_s * unit_mm) / distance_mm;
+  }
+  // Always track pace in seconds per km for last-activity storage
+  if (distance_mm > 0) {
+    s_session_pace_sec = (int32_t)((elapsed_s * 1000000LL) / distance_mm);
   }
 
   ProfileSettings *profile = prv_active_profile();
@@ -875,7 +904,27 @@ static void prv_profile_click_config_provider(void *context) {
 static void prv_main_back_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
-  prv_commit_session_totals("back");
+  // Ruck keeps running — do NOT commit session totals here
+  if (!window_stack_contains_window(s_profile_window)) {
+    window_stack_push(s_profile_window, true);
+  }
+}
+
+static void prv_main_down_click_handler(ClickRecognizerRef recognizer, void *context) {
+  (void)recognizer;
+  (void)context;
+  // Capture last-activity snapshot
+  s_last_activity_distance_m = s_session_distance_m;
+  s_last_activity_calories   = s_session_calories;
+  s_last_activity_pace_sec   = s_session_pace_sec;
+  s_last_activity_timestamp  = (int32_t)time(NULL);
+  persist_write_int(LAST_ACTIVITY_DISTANCE_M_PERSIST_KEY, s_last_activity_distance_m);
+  persist_write_int(LAST_ACTIVITY_CALORIES_PERSIST_KEY,   s_last_activity_calories);
+  persist_write_int(LAST_ACTIVITY_PACE_SEC_PERSIST_KEY,   s_last_activity_pace_sec);
+  persist_write_int(LAST_ACTIVITY_TIMESTAMP_PERSIST_KEY,  s_last_activity_timestamp);
+  // Commit session to lifetime totals
+  prv_commit_session_totals("save");
+  // Navigate to profile selection
   if (!window_stack_contains_window(s_profile_window)) {
     window_stack_push(s_profile_window, true);
   }
@@ -937,6 +986,7 @@ static void prv_main_click_config_provider(void *context) {
   (void)context;
   window_single_click_subscribe(BUTTON_ID_BACK, prv_main_back_click_handler);
   window_single_click_subscribe(BUTTON_ID_UP, prv_main_up_click_handler);
+  window_single_click_subscribe(BUTTON_ID_DOWN, prv_main_down_click_handler);
 }
 
 static void prv_profile_window_load(Window *window) {
@@ -1100,6 +1150,18 @@ static void prv_init(void) {
   if (persist_exists(LIFETIME_CALORIES_PERSIST_KEY)) {
     s_lifetime_calories = persist_read_int(LIFETIME_CALORIES_PERSIST_KEY);
   }
+  if (persist_exists(LAST_ACTIVITY_DISTANCE_M_PERSIST_KEY)) {
+    s_last_activity_distance_m = persist_read_int(LAST_ACTIVITY_DISTANCE_M_PERSIST_KEY);
+  }
+  if (persist_exists(LAST_ACTIVITY_CALORIES_PERSIST_KEY)) {
+    s_last_activity_calories = persist_read_int(LAST_ACTIVITY_CALORIES_PERSIST_KEY);
+  }
+  if (persist_exists(LAST_ACTIVITY_PACE_SEC_PERSIST_KEY)) {
+    s_last_activity_pace_sec = persist_read_int(LAST_ACTIVITY_PACE_SEC_PERSIST_KEY);
+  }
+  if (persist_exists(LAST_ACTIVITY_TIMESTAMP_PERSIST_KEY)) {
+    s_last_activity_timestamp = persist_read_int(LAST_ACTIVITY_TIMESTAMP_PERSIST_KEY);
+  }
 
   s_window = window_create();
   window_set_window_handlers(s_window, (WindowHandlers) {
@@ -1142,7 +1204,7 @@ static void prv_init(void) {
   app_message_register_inbox_received(prv_inbox_received_handler);
   app_message_register_inbox_dropped(prv_inbox_dropped_handler);
   app_message_register_outbox_failed(prv_outbox_failed_handler);
-  app_message_open(1024, 64);
+  app_message_open(1024, 128);
   APP_LOG(APP_LOG_LEVEL_INFO, "App initialized, waiting for config updates");
 
   window_stack_push(s_window, false);

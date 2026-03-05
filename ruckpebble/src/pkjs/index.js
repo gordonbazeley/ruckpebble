@@ -28,6 +28,10 @@
     profile3_name: '',
     lifetime_distance_m_total: 0,
     lifetime_calories_total: 0,
+    last_activity_distance_m: 0,
+    last_activity_calories: 0,
+    last_activity_pace_sec: 0,
+    last_activity_timestamp: 0,
 
     sim_steps_enabled: 1,
     sim_steps_spm: 122
@@ -60,6 +64,10 @@
     out.profile3_terrain_factor = terrainFactorFromType(out.profile3_terrain_type);
     out.lifetime_distance_m_total = parseInt(out.lifetime_distance_m_total, 10) || 0;
     out.lifetime_calories_total = parseInt(out.lifetime_calories_total, 10) || 0;
+    out.last_activity_distance_m = parseInt(out.last_activity_distance_m, 10) || 0;
+    out.last_activity_calories = parseInt(out.last_activity_calories, 10) || 0;
+    out.last_activity_pace_sec = parseInt(out.last_activity_pace_sec, 10) || 0;
+    out.last_activity_timestamp = parseInt(out.last_activity_timestamp, 10) || 0;
     return out;
   }
 
@@ -197,6 +205,13 @@
       '<label>Lifetime calories (app)</label><input type="text" id="lifetime_calories_total" readonly>' +
       '</div>' +
 
+      '<div class="card"><h2>Last Activity</h2>' +
+      '<label>Date / Time</label><input type="text" id="last_activity_datetime" readonly>' +
+      '<label>Distance (km)</label><input type="text" id="last_activity_distance_km" readonly>' +
+      '<label>Pace (min/km)</label><input type="text" id="last_activity_pace" readonly>' +
+      '<label>Calories</label><input type="text" id="last_activity_calories_display" readonly>' +
+      '</div>' +
+
       '<div class="actions">' +
       '<button id="save" type="button">Save</button>' +
       '<button id="reset_defaults" type="button">Reset</button>' +
@@ -254,6 +269,12 @@
       '$("p3_name").value=cfg.profile3_name||"";' +
       '$("lifetime_distance_km_total").value=formatKmFromMeters(cfg.lifetime_distance_m_total);' +
       '$("lifetime_calories_total").value=formatNumber(cfg.lifetime_calories_total);' +
+      'var ts=parseInt(cfg.last_activity_timestamp,10)||0;' +
+      '$("last_activity_datetime").value=ts>0?new Date(ts*1000).toLocaleString():"--";' +
+      '$("last_activity_distance_km").value=formatKmFromMeters(cfg.last_activity_distance_m||0);' +
+      'var ps=parseInt(cfg.last_activity_pace_sec,10)||0;' +
+      '$("last_activity_pace").value=ps>0?Math.floor(ps/60)+":"+(("0"+(ps%60)).slice(-2)):"--";' +
+      '$("last_activity_calories_display").value=formatNumber(cfg.last_activity_calories||0);' +
       'updateRuckWeightLabels();' +
       '}' +
       'applyToForm(s);' +
@@ -320,13 +341,26 @@
 
   Pebble.addEventListener('appmessage', function(e) {
     var payload = (e && e.payload) ? e.payload : {};
-    if (typeof payload.lifetime_distance_m_total === 'number' || typeof payload.lifetime_calories_total === 'number') {
+    if (typeof payload.lifetime_distance_m_total === 'number' || typeof payload.lifetime_calories_total === 'number' ||
+        typeof payload.last_activity_distance_m === 'number' || typeof payload.last_activity_timestamp === 'number') {
       var s = loadSettings();
       if (typeof payload.lifetime_distance_m_total === 'number') {
         s.lifetime_distance_m_total = payload.lifetime_distance_m_total;
       }
       if (typeof payload.lifetime_calories_total === 'number') {
         s.lifetime_calories_total = payload.lifetime_calories_total;
+      }
+      if (typeof payload.last_activity_distance_m === 'number') {
+        s.last_activity_distance_m = payload.last_activity_distance_m;
+      }
+      if (typeof payload.last_activity_calories === 'number') {
+        s.last_activity_calories = payload.last_activity_calories;
+      }
+      if (typeof payload.last_activity_pace_sec === 'number') {
+        s.last_activity_pace_sec = payload.last_activity_pace_sec;
+      }
+      if (typeof payload.last_activity_timestamp === 'number') {
+        s.last_activity_timestamp = payload.last_activity_timestamp;
       }
       saveSettings(normalizeSettings(s));
       if (s_waitingLifetimeCallback) {
