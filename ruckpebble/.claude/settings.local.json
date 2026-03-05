@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pebble build:*)",
+      "Bash(pebble install:*)",
+      "Bash(pebble emu-app-config:*)"
+    ]
+  }
+}

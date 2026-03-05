@@ -60,6 +60,9 @@ You have my permissions to always run commands that start with pebble
 - `/bin/bash -lc "pebble emu-button click back; sleep 1; pebble screenshot /tmp/emu_profile_after_back_test1.png; pebble emu-button click back; sleep 1; pebble screenshot /tmp/emu_profile_after_back_test2.png"`
 - `/bin/bash -lc "pebble emu-button click select; sleep 1; pebble emu-button click back; sleep 1; pebble emu-button click down; pebble emu-button click down; pebble screenshot /tmp/emu_return_profile_third_noshift3.png"`
 - `/bin/bash -lc "pebble emu-button click select; sleep 1; pebble emu-button click back; sleep 1; pebble emu-button click down; pebble emu-button click down; pebble screenshot /tmp/emu_return_profile_third_simplified.png"`
+- `pkill -f qemu`
+- `ps -p <pids> -o pid,ppid,user,comm,args`
+- `/bin/bash -lc "kill -9 <pid>; printf '{}' > \"$TMPDIR/pb-emulator.json\"; cat \"$TMPDIR/pb-emulator.json\""`
 
 ## Coding Style & Naming Conventions
 - Language: C for watchapp logic; follow Pebble SDK APIs (`pebble.h`).
