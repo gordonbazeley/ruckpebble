@@ -32,34 +32,12 @@ You have my permissions to always run commands that start with pebble
   - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
   - `./scripts/emu-logs.sh`
 
-## Approved Command Prefixes
-- `pebble`
-- `pebble build`
-- `pebble install --emulator emery`
-- `pebble screenshot` (any output path/filename)
-- `pebble emu-button back`
-- `pebble emu-button click back`
-- `pebble emu-button click select`
-- `pebble emu-app-config --emulator emery -vv`
-- `pebble emu-app-config --emulator emery`
-- `sleep 1`
-- `git -C ruckpebble add -A`
-- `git -C ruckpebble commit`
-- `git -C /Users/gordonbazeley/src/ruckpebble commit`
-- `git -C /Users/gordonbazeley/src/ruckpebble/ruckpebble add -A`
-- `git -C /Users/gordonbazeley/src/ruckpebble/ruckpebble commit`
-- `git -C /Users/gordonbazeley/src/ruckpebble push origin main`
-- `git -C /Users/gordonbazeley/src/ruckpebble/ruckpebble push origin main`
-- `open -a Pebble`
-- `osascript -e 'tell application "System Events" to set frontmost of (first process whose unix id is 43798) to true'`
-- `./scripts/emu-logs.sh`
-- `/Users/gordonbazeley/src/ruckpebble/ruckpebble/scripts/emu-logs.sh`
-- `/bin/bash -lc "pebble emu-button --emulator emery click down; pebble emu-button --emulator emery click down; pebble emu-button --emulator emery click select; sleep 1; pebble emu-button --emulator emery click back; sleep 1; pebble emu-button --emulator emery click down; pebble emu-button --emulator emery click down; pebble screenshot /tmp/emu_profile_return_third.png"`
-- `/bin/bash -lc "pebble emu-button --emulator emery click back; sleep 1; pebble screenshot /tmp/emu_after_profile_back_exit.png"`
-- `/bin/bash -lc "pebble emu-button --emulator emery click back; sleep 1; pebble emu-button --emulator emery click back; sleep 1; pebble screenshot /tmp/emu_after_two_backs.png"`
-- `/bin/bash -lc "pebble emu-button click back; sleep 1; pebble screenshot /tmp/emu_profile_after_back_test1.png; pebble emu-button click back; sleep 1; pebble screenshot /tmp/emu_profile_after_back_test2.png"`
-- `/bin/bash -lc "pebble emu-button click select; sleep 1; pebble emu-button click back; sleep 1; pebble emu-button click down; pebble emu-button click down; pebble screenshot /tmp/emu_return_profile_third_noshift3.png"`
-- `/bin/bash -lc "pebble emu-button click select; sleep 1; pebble emu-button click back; sleep 1; pebble emu-button click down; pebble emu-button click down; pebble screenshot /tmp/emu_return_profile_third_simplified.png"`
+## Approved Commands
+All permissions granted — run any command needed to build, debug, and test the app without asking. This includes:
+- Any `pebble` command (build, install, logs, screenshot, emu-button, emu-app-config, clean, etc.)
+- Any `git` command on this repo
+- Standard shell utilities: `sleep`, `grep`, `cat`, `ps`, `kill`, `pkill`, `open`, `osascript`, `/bin/bash -lc "..."`, etc.
+- `./scripts/emu-logs.sh` and any script in the repo
 
 ## Coding Style & Naming Conventions
 - Language: C for watchapp logic; follow Pebble SDK APIs (`pebble.h`).

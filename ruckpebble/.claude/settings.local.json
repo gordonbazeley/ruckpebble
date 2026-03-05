@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pebble:*)",
+      "Bash(pkill:*)",
+      "Read(//Users/gordonbazeley/src/ruckpebble/ruckpebble/$TMPDIR/**)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

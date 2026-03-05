@@ -7,38 +7,6 @@
 #define MESSAGE_KEY_sim_steps_spm 9
 #endif
 
-// Keep builds compatible when package messageKeys are stale/missing in some environments.
-#ifndef MESSAGE_KEY_profile1_terrain_type
-#define MESSAGE_KEY_profile1_terrain_type 0x7FFFFFF0
-#endif
-#ifndef MESSAGE_KEY_profile2_terrain_type
-#define MESSAGE_KEY_profile2_terrain_type 0x7FFFFFF1
-#endif
-#ifndef MESSAGE_KEY_profile3_terrain_type
-#define MESSAGE_KEY_profile3_terrain_type 0x7FFFFFF2
-#endif
-#ifndef MESSAGE_KEY_request_lifetime_totals
-#define MESSAGE_KEY_request_lifetime_totals 0x7FFFFFF3
-#endif
-#ifndef MESSAGE_KEY_lifetime_distance_m_total
-#define MESSAGE_KEY_lifetime_distance_m_total 0x7FFFFFF4
-#endif
-#ifndef MESSAGE_KEY_lifetime_calories_total
-#define MESSAGE_KEY_lifetime_calories_total 0x7FFFFFF5
-#endif
-#ifndef MESSAGE_KEY_last_activity_distance_m
-#define MESSAGE_KEY_last_activity_distance_m 0x7FFFFFE0
-#endif
-#ifndef MESSAGE_KEY_last_activity_calories
-#define MESSAGE_KEY_last_activity_calories 0x7FFFFFE1
-#endif
-#ifndef MESSAGE_KEY_last_activity_pace_sec
-#define MESSAGE_KEY_last_activity_pace_sec 0x7FFFFFE2
-#endif
-#ifndef MESSAGE_KEY_last_activity_timestamp
-#define MESSAGE_KEY_last_activity_timestamp 0x7FFFFFE3
-#endif
-
 #define PROFILE_COUNT 3
 #define PROFILE_NAME_MAX_LEN 33
 #define TERRAIN_TYPE_MAX_LEN 16
@@ -180,6 +148,8 @@ static int32_t prv_active_profile_index(void) {
   }
   return s_settings.active_profile;
 }
+
+static void prv_status_timer_callback(void *context);
 
 static void prv_set_profile_name(int32_t profile_index, const char *name) {
   if (profile_index < 0 || profile_index >= PROFILE_COUNT) {
@@ -399,6 +369,9 @@ static void prv_save_settings(void) {
 }
 
 static void prv_send_lifetime_totals(void) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "prv_send_lifetime_totals: dist=%ld cal=%ld last_dist=%ld last_ts=%ld",
+    (long)s_last_activity_distance_m, (long)s_last_activity_calories,
+    (long)s_last_activity_distance_m, (long)s_last_activity_timestamp);
   DictionaryIterator *iter = NULL;
   AppMessageResult result = app_message_outbox_begin(&iter);
   if (result != APP_MSG_OK || !iter) {
@@ -413,9 +386,7 @@ static void prv_send_lifetime_totals(void) {
   dict_write_int32(iter, MESSAGE_KEY_last_activity_timestamp,  s_last_activity_timestamp);
   dict_write_end(iter);
   result = app_message_outbox_send();
-  if (result != APP_MSG_OK) {
-    APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed for totals: %d", (int)result);
-  }
+  APP_LOG(APP_LOG_LEVEL_INFO, "prv_send_lifetime_totals: send result=%d", (int)result);
 }
 
 static void prv_commit_session_totals(const char *reason) {
@@ -927,6 +898,8 @@ static void prv_main_down_click_handler(ClickRecognizerRef recognizer, void *con
   persist_write_int(LAST_ACTIVITY_TIMESTAMP_PERSIST_KEY,  s_last_activity_timestamp);
   // Commit session to lifetime totals
   prv_commit_session_totals("save");
+  // Proactively push last activity + lifetime totals to phone JS
+  prv_send_lifetime_totals();
   vibes_short_pulse();
   // Show brief status message then navigate to profile selection
   window_stack_push(s_status_window, true);
