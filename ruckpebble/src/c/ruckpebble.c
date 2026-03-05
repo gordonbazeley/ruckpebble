@@ -108,6 +108,9 @@ static Window *s_profile_window;
 static MenuLayer *s_profile_menu_layer;
 static Window *s_music_window;
 static MenuLayer *s_music_menu_layer;
+static Window *s_status_window;
+static TextLayer *s_status_text_layer;
+static AppTimer *s_status_timer;
 static Window *s_window;
 static Layer *s_grid_layer;
 static TextLayer *s_top_time_layer;
@@ -924,10 +927,13 @@ static void prv_main_down_click_handler(ClickRecognizerRef recognizer, void *con
   persist_write_int(LAST_ACTIVITY_TIMESTAMP_PERSIST_KEY,  s_last_activity_timestamp);
   // Commit session to lifetime totals
   prv_commit_session_totals("save");
-  // Navigate to profile selection
-  if (!window_stack_contains_window(s_profile_window)) {
-    window_stack_push(s_profile_window, true);
+  vibes_short_pulse();
+  // Show brief status message then navigate to profile selection
+  window_stack_push(s_status_window, true);
+  if (s_status_timer) {
+    app_timer_cancel(s_status_timer);
   }
+  s_status_timer = app_timer_register(1500, prv_status_timer_callback, NULL);
 }
 
 static uint16_t prv_music_get_num_rows_callback(MenuLayer *menu_layer, uint16_t section_index, void *context) {
@@ -974,6 +980,35 @@ static void prv_music_window_unload(Window *window) {
   (void)window;
   menu_layer_destroy(s_music_menu_layer);
   s_music_menu_layer = NULL;
+}
+
+static void prv_status_timer_callback(void *context) {
+  (void)context;
+  s_status_timer = NULL;
+  if (window_stack_contains_window(s_status_window)) {
+    window_stack_remove(s_status_window, true);
+  }
+  if (!window_stack_contains_window(s_profile_window)) {
+    window_stack_push(s_profile_window, true);
+  }
+}
+
+static void prv_status_window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+  s_status_text_layer = text_layer_create(bounds);
+  text_layer_set_text(s_status_text_layer, "Saving ruck...");
+  text_layer_set_text_alignment(s_status_text_layer, GTextAlignmentCenter);
+  text_layer_set_font(s_status_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
+  text_layer_set_background_color(s_status_text_layer, GColorBlack);
+  text_layer_set_text_color(s_status_text_layer, GColorWhite);
+  layer_add_child(window_layer, text_layer_get_layer(s_status_text_layer));
+}
+
+static void prv_status_window_unload(Window *window) {
+  (void)window;
+  text_layer_destroy(s_status_text_layer);
+  s_status_text_layer = NULL;
 }
 
 static void prv_main_up_click_handler(ClickRecognizerRef recognizer, void *context) {
@@ -1182,6 +1217,13 @@ static void prv_init(void) {
     .unload = prv_music_window_unload,
   });
 
+  s_status_window = window_create();
+  window_set_background_color(s_status_window, GColorBlack);
+  window_set_window_handlers(s_status_window, (WindowHandlers) {
+    .load = prv_status_window_load,
+    .unload = prv_status_window_unload,
+  });
+
   time_t now = time(NULL);
   s_start_time = now;
   struct tm *start_tm = localtime(&now);
@@ -1217,6 +1259,11 @@ static void prv_deinit(void) {
   if (s_health_available) {
     health_service_events_unsubscribe();
   }
+  if (s_status_timer) {
+    app_timer_cancel(s_status_timer);
+    s_status_timer = NULL;
+  }
+  window_destroy(s_status_window);
   window_destroy(s_music_window);
   window_destroy(s_profile_window);
   window_destroy(s_window);
