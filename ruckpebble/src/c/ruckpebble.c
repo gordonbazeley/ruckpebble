@@ -125,6 +125,7 @@ static int32_t s_last_activity_calories   = 0;
 static int32_t s_last_activity_pace_sec   = 0;
 static int32_t s_last_activity_timestamp  = 0;
 static int32_t s_session_pace_sec         = 0;
+static char s_status_text[64] = "Saving ruck...";
 
 #define EMULATOR_TIME_SCALE 10
 
@@ -150,6 +151,7 @@ static int32_t prv_active_profile_index(void) {
 }
 
 static void prv_status_timer_callback(void *context);
+static void prv_show_status_message(const char *text, uint32_t duration_ms);
 
 static void prv_set_profile_name(int32_t profile_index, const char *name) {
   if (profile_index < 0 || profile_index >= PROFILE_COUNT) {
@@ -368,10 +370,31 @@ static void prv_save_settings(void) {
   persist_write_data(SETTINGS_PERSIST_KEY, &s_settings, sizeof(s_settings));
 }
 
-static void prv_send_lifetime_totals(void) {
-  APP_LOG(APP_LOG_LEVEL_INFO, "prv_send_lifetime_totals: dist=%ld cal=%ld last_dist=%ld last_ts=%ld",
+static void prv_show_status_message(const char *text, uint32_t duration_ms) {
+  if (!text || text[0] == '\0') {
+    text = "Saving ruck...";
+  }
+  strncpy(s_status_text, text, sizeof(s_status_text) - 1);
+  s_status_text[sizeof(s_status_text) - 1] = '\0';
+
+  if (s_status_text_layer) {
+    text_layer_set_text(s_status_text_layer, s_status_text);
+  }
+
+  if (!window_stack_contains_window(s_status_window)) {
+    window_stack_push(s_status_window, true);
+  }
+  if (s_status_timer) {
+    app_timer_cancel(s_status_timer);
+  }
+  s_status_timer = app_timer_register(duration_ms, prv_status_timer_callback, NULL);
+}
+
+static void prv_send_lifetime_totals(bool insert_timeline_pin) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "prv_send_lifetime_totals: dist=%ld cal=%ld last_dist=%ld last_ts=%ld insert_pin=%d",
     (long)s_last_activity_distance_m, (long)s_last_activity_calories,
-    (long)s_last_activity_distance_m, (long)s_last_activity_timestamp);
+    (long)s_last_activity_distance_m, (long)s_last_activity_timestamp,
+    (int)insert_timeline_pin);
   DictionaryIterator *iter = NULL;
   AppMessageResult result = app_message_outbox_begin(&iter);
   if (result != APP_MSG_OK || !iter) {
@@ -384,6 +407,9 @@ static void prv_send_lifetime_totals(void) {
   dict_write_int32(iter, MESSAGE_KEY_last_activity_calories,   s_last_activity_calories);
   dict_write_int32(iter, MESSAGE_KEY_last_activity_pace_sec,   s_last_activity_pace_sec);
   dict_write_int32(iter, MESSAGE_KEY_last_activity_timestamp,  s_last_activity_timestamp);
+  if (insert_timeline_pin) {
+    dict_write_int32(iter, MESSAGE_KEY_insert_timeline_pin, 1);
+  }
   dict_write_end(iter);
   result = app_message_outbox_send();
   APP_LOG(APP_LOG_LEVEL_INFO, "prv_send_lifetime_totals: send result=%d", (int)result);
@@ -682,7 +708,12 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   }
   t = dict_find(iter, MESSAGE_KEY_request_lifetime_totals);
   if (t && t->value->int32 == 1) {
-    prv_send_lifetime_totals();
+    prv_send_lifetime_totals(false);
+  }
+  t = dict_find(iter, MESSAGE_KEY_timeline_status_text);
+  if (t && t->type == TUPLE_CSTRING) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "Timeline status: %s", t->value->cstring);
+    prv_show_status_message(t->value->cstring, 2200);
   }
 
   prv_save_settings();
@@ -899,14 +930,10 @@ static void prv_main_down_click_handler(ClickRecognizerRef recognizer, void *con
   // Commit session to lifetime totals
   prv_commit_session_totals("save");
   // Proactively push last activity + lifetime totals to phone JS
-  prv_send_lifetime_totals();
+  prv_send_lifetime_totals(true);
   vibes_short_pulse();
   // Show brief status message then navigate to profile selection
-  window_stack_push(s_status_window, true);
-  if (s_status_timer) {
-    app_timer_cancel(s_status_timer);
-  }
-  s_status_timer = app_timer_register(1500, prv_status_timer_callback, NULL);
+  prv_show_status_message("Saving ruck...", 1500);
 }
 
 static uint16_t prv_music_get_num_rows_callback(MenuLayer *menu_layer, uint16_t section_index, void *context) {
@@ -970,7 +997,7 @@ static void prv_status_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
   s_status_text_layer = text_layer_create(bounds);
-  text_layer_set_text(s_status_text_layer, "Saving ruck...");
+  text_layer_set_text(s_status_text_layer, s_status_text);
   text_layer_set_text_alignment(s_status_text_layer, GTextAlignmentCenter);
   text_layer_set_font(s_status_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
   text_layer_set_background_color(s_status_text_layer, GColorBlack);

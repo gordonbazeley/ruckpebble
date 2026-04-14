@@ -1,6 +1,7 @@
 /* Settings page for Pebble app with shared settings + 3 profiles. */
 (function() {
   var SETTINGS_KEY = 'ruck_settings_v2';
+  var DEBUG_TIMELINE_PIN_KEY = 'ruck_debug_timeline_pin_v1';
 
   var defaults = {
     weight_value: 800,
@@ -53,6 +54,22 @@
 
   function saveSettings(settings) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }
+
+  function saveDebugTimelinePin(pin) {
+    localStorage.setItem(DEBUG_TIMELINE_PIN_KEY, JSON.stringify(pin));
+  }
+
+  function loadDebugTimelinePin() {
+    var raw = localStorage.getItem(DEBUG_TIMELINE_PIN_KEY);
+    if (!raw) {
+      return null;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
   }
 
   function hasOwn(obj, key) {
@@ -400,24 +417,90 @@
     s_latestSettingsSnapshot = normalizeSettings(loadSettings());
     syncSettingsToWatch(s_latestSettingsSnapshot);
     requestLifetimeTotals();
+    var debugPin = loadDebugTimelinePin();
+    if (debugPin) {
+      console.log('last cached timeline pin:', JSON.stringify(debugPin));
+    }
   });
+
+  function buildTimelinePin(activity) {
+    var ts = activity.last_activity_timestamp;
+    var pinId = 'ruck-' + ts;
+    var pinTime = new Date(ts * 1000).toISOString();
+
+    var distKm = (activity.last_activity_distance_m / 1000).toFixed(2);
+    var cal = activity.last_activity_calories;
+    var paceSec = activity.last_activity_pace_sec;
+    var subtitle = distKm + ' km';
+    if (cal > 0) { subtitle += ' \u00b7 ' + cal + ' kcal'; }
+    var body = paceSec > 0
+      ? 'Pace: ' + Math.floor(paceSec / 60) + ':' + ('0' + (paceSec % 60)).slice(-2) + ' /km'
+      : '';
+
+    var layout = { type: 'genericPin', title: 'Ruck complete', subtitle: subtitle };
+    if (body) { layout.body = body; }
+    return { id: pinId, time: pinTime, layout: layout };
+  }
+
+  function insertTimelinePin(activity) {
+    function sendTimelineStatus(text) {
+      Pebble.sendAppMessage({ timeline_status_text: text }, function() {
+        console.log('timeline status sent:', text);
+      }, function(err) {
+        console.log('timeline status send failed:', text, JSON.stringify(err));
+      });
+    }
+
+    var pin = buildTimelinePin(activity);
+    saveDebugTimelinePin(pin);
+    console.log('timeline pin payload:', JSON.stringify(pin));
+
+    Pebble.getTimelineToken(function(token) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', 'https://timeline-api.getpebble.com/v1/user/pins/' + pin.id, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('X-User-Token', token);
+      xhr.onload = function() {
+        console.log('timeline pin response:', xhr.status, xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          sendTimelineStatus('Timeline saved');
+        } else {
+          sendTimelineStatus('Timeline HTTP ' + xhr.status);
+        }
+      };
+      xhr.onerror = function() {
+        console.log('timeline pin request error');
+        sendTimelineStatus('Timeline request failed');
+      };
+      xhr.send(JSON.stringify(pin));
+    }, function(err) {
+      console.log('getTimelineToken failed:', err);
+      console.log('timeline debug pin retained locally:', JSON.stringify(pin));
+      sendTimelineStatus('Pin cached locally');
+    });
+  }
 
   Pebble.addEventListener('appmessage', function(e) {
     var payload = (e && e.payload) ? e.payload : {};
     console.log('appmessage payload:', JSON.stringify(payload));
     if (hasAny(payload, [
+      'insert_timeline_pin',
       'lifetime_distance_m_total', 'lifetime_calories_total',
       'last_activity_distance_m', 'last_activity_calories',
       'last_activity_pace_sec', 'last_activity_timestamp',
-      '10021', '10022', '10023', '10024', '10025', '10026'
+      '10020', '10022', '10023', '10024', '10025', '10026', '10027'
     ])) {
       var s = loadSettings();
-      s.lifetime_distance_m_total = readIntFromPayload(payload, 'lifetime_distance_m_total', 10021, s.lifetime_distance_m_total || 0);
-      s.lifetime_calories_total = readIntFromPayload(payload, 'lifetime_calories_total', 10022, s.lifetime_calories_total || 0);
-      s.last_activity_distance_m = readIntFromPayload(payload, 'last_activity_distance_m', 10023, s.last_activity_distance_m || 0);
-      s.last_activity_calories = readIntFromPayload(payload, 'last_activity_calories', 10024, s.last_activity_calories || 0);
-      s.last_activity_pace_sec = readIntFromPayload(payload, 'last_activity_pace_sec', 10025, s.last_activity_pace_sec || 0);
-      s.last_activity_timestamp = readIntFromPayload(payload, 'last_activity_timestamp', 10026, s.last_activity_timestamp || 0);
+      var prevTimestamp = s.last_activity_timestamp || 0;
+      var insertTimelinePinRequested = readIntFromPayload(payload, 'insert_timeline_pin', 10020, 0) === 1;
+      s.lifetime_distance_m_total = readIntFromPayload(payload, 'lifetime_distance_m_total', 10022, s.lifetime_distance_m_total || 0);
+      s.lifetime_calories_total = readIntFromPayload(payload, 'lifetime_calories_total', 10023, s.lifetime_calories_total || 0);
+      s.last_activity_distance_m = readIntFromPayload(payload, 'last_activity_distance_m', 10024, s.last_activity_distance_m || 0);
+      s.last_activity_calories = readIntFromPayload(payload, 'last_activity_calories', 10025, s.last_activity_calories || 0);
+      s.last_activity_pace_sec = readIntFromPayload(payload, 'last_activity_pace_sec', 10026, s.last_activity_pace_sec || 0);
+      s.last_activity_timestamp = readIntFromPayload(payload, 'last_activity_timestamp', 10027, s.last_activity_timestamp || 0);
+      var isNewSave = s.last_activity_timestamp > prevTimestamp && s.last_activity_timestamp > 0;
+      var shouldInsertTimelinePin = (insertTimelinePinRequested || isNewSave) && s.last_activity_timestamp > 0;
       s = normalizeSettings(s);
       s_latestSettingsSnapshot = s;
       saveSettings(s);
@@ -429,6 +512,10 @@
         last_activity_pace_sec: s.last_activity_pace_sec,
         last_activity_timestamp: s.last_activity_timestamp
       }));
+      if (shouldInsertTimelinePin) {
+        console.log('timeline pin requested, inserting timeline pin');
+        insertTimelinePin(s);
+      }
       if (s_waitingLifetimeCallback) {
         s_waitingLifetimeCallback();
       }
