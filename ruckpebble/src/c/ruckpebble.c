@@ -528,7 +528,7 @@ static void prv_update_display(void) {
   int64_t walk_kcal_total = (walk_kcal_per_hour * elapsed_s) / 3600;
 
   static char top_time_buf[16];
-  static char distance_buf[16];
+  static char distance_buf[20];
   static char profile_name_buf[24];
   static char pace_header_buf[16];
   static char pace_value_buf[16];
@@ -555,8 +555,8 @@ static void prv_update_display(void) {
     snprintf(pace_header_buf, sizeof(pace_header_buf), "--:--/%s", distance_unit_label);
     snprintf(pace_value_buf, sizeof(pace_value_buf), "--:--");
   }
-  snprintf(distance_buf, sizeof(distance_buf), "%ld.%02ld%s",
-           (long)(distance_x100 / 100), (long)labs(distance_x100 % 100), distance_unit_label);
+  snprintf(distance_buf, sizeof(distance_buf), "%lld.%02lld%s",
+           (long long)(distance_x100 / 100), (long long)llabs(distance_x100 % 100), distance_unit_label);
   snprintf(timer_value_buf, sizeof(timer_value_buf), "%ld:%02ld",
            (long)(elapsed_s / 60), (long)(elapsed_s % 60));
   snprintf(steps_value_buf, sizeof(steps_value_buf), "%ld", (long)steps);
@@ -772,9 +772,9 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   }
   ProfileSettings *p = &s_settings.profiles[row];
   static char legacy_title[16];
-  static char weight_value[12];
+  static char weight_value[16];
   static char terrain_value[12];
-  static char grade_value[8];
+  static char grade_value[12];
   const char *title_text = legacy_title;
   const char *weight_unit = (s_settings.ruck_weight_unit == 1) ? "lb" : "kg";
   const int16_t y = 0;

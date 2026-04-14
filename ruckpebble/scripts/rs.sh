@@ -4,6 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Reset emulator state so install/control commands target the same fresh instance.
+unset PYTHONPATH
+unset PYTHONHOME
 pebble kill >/dev/null 2>&1 || true
 printf '{}' > "${TMPDIR}pb-emulator.json"
 
