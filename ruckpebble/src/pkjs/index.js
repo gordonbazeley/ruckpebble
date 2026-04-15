@@ -1,6 +1,7 @@
 /* Settings page for Pebble app with shared settings + 3 profiles. */
 (function() {
   var SETTINGS_KEY = 'ruck_settings_v2';
+  var DEBUG_TIMELINE_PIN_KEY = 'ruck_debug_timeline_pin_v1';
 
   var defaults = {
     weight_value: 800,
@@ -37,6 +38,7 @@
     sim_steps_spm: 122
   };
   var s_waitingLifetimeCallback = null;
+  var s_latestSettingsSnapshot = null;
 
   function loadSettings() {
     var raw = localStorage.getItem(SETTINGS_KEY);
@@ -52,6 +54,53 @@
 
   function saveSettings(settings) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }
+
+  function saveDebugTimelinePin(pin) {
+    localStorage.setItem(DEBUG_TIMELINE_PIN_KEY, JSON.stringify(pin));
+  }
+
+  function loadDebugTimelinePin() {
+    var raw = localStorage.getItem(DEBUG_TIMELINE_PIN_KEY);
+    if (!raw) {
+      return null;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function hasOwn(obj, key) {
+    return Object.prototype.hasOwnProperty.call(obj, key);
+  }
+
+  function hasAny(obj, keys) {
+    for (var i = 0; i < keys.length; i += 1) {
+      if (hasOwn(obj, keys[i])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function toInt(value, fallback) {
+    var n = parseInt(value, 10);
+    if (isNaN(n)) {
+      return fallback;
+    }
+    return n;
+  }
+
+  function readIntFromPayload(payload, nameKey, numericKey, fallback) {
+    if (hasOwn(payload, nameKey)) {
+      return toInt(payload[nameKey], fallback);
+    }
+    if (hasOwn(payload, String(numericKey))) {
+      return toInt(payload[String(numericKey)], fallback);
+    }
+    return fallback;
   }
 
   function normalizeSettings(settings) {
@@ -73,6 +122,7 @@
 
   function syncSettingsToWatch(settings) {
     var normalized = normalizeSettings(settings);
+    s_latestSettingsSnapshot = normalized;
     saveSettings(normalized);
     Pebble.sendAppMessage(normalized, function() {
       console.log('initial/send settings success');
@@ -119,27 +169,54 @@
 
   function requestLifetimeTotals(onComplete) {
     var done = false;
+    var timeoutId = null;
+    var attempts = 0;
+    var maxAttempts = 3;
+    var attemptTimeoutMs = 1200;
     function finish() {
       if (done) {
         return;
       }
       done = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
       s_waitingLifetimeCallback = null;
       if (onComplete) {
         onComplete();
       }
     }
+    function scheduleAttempt() {
+      if (done) {
+        return;
+      }
+      attempts += 1;
+      Pebble.sendAppMessage({ request_lifetime_totals: 1 }, function() {
+        // Wait for appmessage response. Retry timer handles missed responses.
+      }, function() {
+        if (attempts >= maxAttempts) {
+          finish();
+          return;
+        }
+      });
+      timeoutId = setTimeout(function() {
+        if (done) {
+          return;
+        }
+        if (attempts >= maxAttempts) {
+          finish();
+          return;
+        }
+        scheduleAttempt();
+      }, attemptTimeoutMs);
+    }
     s_waitingLifetimeCallback = finish;
-    Pebble.sendAppMessage({ request_lifetime_totals: 1 }, function() {
-      // Allow a brief window for appmessage payload to arrive before opening config.
-      setTimeout(finish, 250);
-    }, function() {
-      finish();
-    });
+    scheduleAttempt();
   }
 
-  function openConfig() {
-    var s = loadSettings();
+  function openConfig(settingsSnapshot) {
+    var s = normalizeSettings(settingsSnapshot || s_latestSettingsSnapshot || loadSettings());
     var p1TerrainType = terrainTypeFromSettings(s.profile1_terrain_type, s.profile1_terrain_factor);
     var p2TerrainType = terrainTypeFromSettings(s.profile2_terrain_type, s.profile2_terrain_factor);
     var p3TerrainType = terrainTypeFromSettings(s.profile3_terrain_type, s.profile3_terrain_factor);
@@ -165,6 +242,10 @@
       '.actions button{margin-top:16px;padding:11px;font-size:16px;color:#fff;border:0;border-radius:6px;}' +
       '#save{flex:2;background:#111;}' +
       '#reset_defaults{flex:1;background:#666;}' +
+      '.stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0f0;}' +
+      '.stat-row:last-child{border-bottom:none;}' +
+      '.stat-label{font-size:13px;color:#555;}' +
+      '.stat-value{font-size:14px;font-weight:600;color:#111;}' +
       '</style></head><body>' +
       '<h1>Ruck Settings</h1>' +
 
@@ -201,15 +282,15 @@
       '</div>' +
 
       '<div class="card"><h2>Tracked Totals</h2>' +
-      '<label>Lifetime distance (app, km)</label><input type="text" id="lifetime_distance_km_total" readonly>' +
-      '<label>Lifetime calories (app)</label><input type="text" id="lifetime_calories_total" readonly>' +
+      '<div class="stat-row"><span class="stat-label">Lifetime distance (km)</span><span class="stat-value" id="lifetime_distance_km_total">--</span></div>' +
+      '<div class="stat-row"><span class="stat-label">Lifetime calories</span><span class="stat-value" id="lifetime_calories_total">--</span></div>' +
       '</div>' +
 
       '<div class="card"><h2>Last Activity</h2>' +
-      '<label>Date / Time</label><input type="text" id="last_activity_datetime" readonly>' +
-      '<label>Distance (km)</label><input type="text" id="last_activity_distance_km" readonly>' +
-      '<label>Pace (min/km)</label><input type="text" id="last_activity_pace" readonly>' +
-      '<label>Calories</label><input type="text" id="last_activity_calories_display" readonly>' +
+      '<div class="stat-row"><span class="stat-label">Date / Time</span><span class="stat-value" id="last_activity_datetime">--</span></div>' +
+      '<div class="stat-row"><span class="stat-label">Distance (km)</span><span class="stat-value" id="last_activity_distance_km">--</span></div>' +
+      '<div class="stat-row"><span class="stat-label">Pace</span><span class="stat-value" id="last_activity_pace">--</span></div>' +
+      '<div class="stat-row"><span class="stat-label">Calories</span><span class="stat-value" id="last_activity_calories_display">--</span></div>' +
       '</div>' +
 
       '<div class="actions">' +
@@ -267,14 +348,14 @@
       '$("p3_terrain_type").value=terrainTypeFromSettingsInner(cfg.profile3_terrain_type,cfg.profile3_terrain_factor);' +
       '$("p3_grade_percent").value=Math.round(cfg.profile3_grade_percent/10);' +
       '$("p3_name").value=cfg.profile3_name||"";' +
-      '$("lifetime_distance_km_total").value=formatKmFromMeters(cfg.lifetime_distance_m_total);' +
-      '$("lifetime_calories_total").value=formatNumber(cfg.lifetime_calories_total);' +
+      '$("lifetime_distance_km_total").textContent=formatKmFromMeters(cfg.lifetime_distance_m_total);' +
+      '$("lifetime_calories_total").textContent=formatNumber(cfg.lifetime_calories_total);' +
       'var ts=parseInt(cfg.last_activity_timestamp,10)||0;' +
-      '$("last_activity_datetime").value=ts>0?new Date(ts*1000).toLocaleString():"--";' +
-      '$("last_activity_distance_km").value=formatKmFromMeters(cfg.last_activity_distance_m||0);' +
+      'if(ts>0){var _d=new Date(ts*1000);var _day=_d.getDate();var _sfx=["th","st","nd","rd"];var _v=_day%100;var _ord=_sfx[(_v-20)%10]||_sfx[_v]||_sfx[0];var _mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][_d.getMonth()];$("last_activity_datetime").textContent=_day+_ord+" "+_mo+" "+("0"+_d.getHours()).slice(-2)+":"+("0"+_d.getMinutes()).slice(-2);}else{$("last_activity_datetime").textContent="--";}' +
+      '$("last_activity_distance_km").textContent=formatKmFromMeters(cfg.last_activity_distance_m||0);' +
       'var ps=parseInt(cfg.last_activity_pace_sec,10)||0;' +
-      '$("last_activity_pace").value=ps>0?Math.floor(ps/60)+":"+(("0"+(ps%60)).slice(-2)):"--";' +
-      '$("last_activity_calories_display").value=formatNumber(cfg.last_activity_calories||0);' +
+      '$("last_activity_pace").textContent=ps>0?Math.floor(ps/60)+":"+(("0"+(ps%60)).slice(-2))+" /km":"--";' +
+      '$("last_activity_calories_display").textContent=formatNumber(cfg.last_activity_calories||0);' +
       'updateRuckWeightLabels();' +
       '}' +
       'applyToForm(s);' +
@@ -310,12 +391,6 @@
       'profile3_terrain_factor: terrainFactorFromType($("p3_terrain_type").value),' +
       'profile3_grade_percent: (parseInt($("p3_grade_percent").value,10)||0)*10,' +
       'profile3_name: ($("p3_name").value||"").trim().slice(0,32),' +
-      'lifetime_distance_m_total: (s.lifetime_distance_m_total||0),' +
-      'lifetime_calories_total: parseInt($("lifetime_calories_total").value,10)||0,' +
-      'last_activity_distance_m: (s.last_activity_distance_m||0),' +
-      'last_activity_calories: (s.last_activity_calories||0),' +
-      'last_activity_pace_sec: (s.last_activity_pace_sec||0),' +
-      'last_activity_timestamp: (s.last_activity_timestamp||0),' +
       'sim_steps_enabled: (s.sim_steps_enabled?1:0),' +
       'sim_steps_spm: (s.sim_steps_spm||122)' +
       '};' +
@@ -333,40 +408,114 @@
   Pebble.addEventListener('showConfiguration', function() {
     console.log('showConfiguration event');
     requestLifetimeTotals(function() {
-      openConfig();
+      openConfig(s_latestSettingsSnapshot);
     });
   });
 
   Pebble.addEventListener('ready', function() {
     console.log('ready: syncing settings to watch');
-    syncSettingsToWatch(loadSettings());
+    s_latestSettingsSnapshot = normalizeSettings(loadSettings());
+    syncSettingsToWatch(s_latestSettingsSnapshot);
     requestLifetimeTotals();
+    var debugPin = loadDebugTimelinePin();
+    if (debugPin) {
+      console.log('last cached timeline pin:', JSON.stringify(debugPin));
+    }
   });
+
+  function buildTimelinePin(activity) {
+    var ts = activity.last_activity_timestamp;
+    var pinId = 'ruck-' + ts;
+    var pinTime = new Date(ts * 1000).toISOString();
+
+    var distKm = (activity.last_activity_distance_m / 1000).toFixed(2);
+    var cal = activity.last_activity_calories;
+    var paceSec = activity.last_activity_pace_sec;
+    var subtitle = distKm + ' km';
+    if (cal > 0) { subtitle += ' \u00b7 ' + cal + ' kcal'; }
+    var body = paceSec > 0
+      ? 'Pace: ' + Math.floor(paceSec / 60) + ':' + ('0' + (paceSec % 60)).slice(-2) + ' /km'
+      : '';
+
+    var layout = { type: 'genericPin', title: 'Ruck complete', subtitle: subtitle };
+    if (body) { layout.body = body; }
+    return { id: pinId, time: pinTime, layout: layout };
+  }
+
+  function insertTimelinePin(activity) {
+    function sendTimelineStatus(text) {
+      Pebble.sendAppMessage({ timeline_status_text: text }, function() {
+        console.log('timeline status sent:', text);
+      }, function(err) {
+        console.log('timeline status send failed:', text, JSON.stringify(err));
+      });
+    }
+
+    var pin = buildTimelinePin(activity);
+    saveDebugTimelinePin(pin);
+    console.log('timeline pin payload:', JSON.stringify(pin));
+
+    Pebble.getTimelineToken(function(token) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', 'https://timeline-api.getpebble.com/v1/user/pins/' + pin.id, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('X-User-Token', token);
+      xhr.onload = function() {
+        console.log('timeline pin response:', xhr.status, xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          sendTimelineStatus('Timeline saved');
+        } else {
+          sendTimelineStatus('Timeline HTTP ' + xhr.status);
+        }
+      };
+      xhr.onerror = function() {
+        console.log('timeline pin request error');
+        sendTimelineStatus('Timeline request failed');
+      };
+      xhr.send(JSON.stringify(pin));
+    }, function(err) {
+      console.log('getTimelineToken failed:', err);
+      console.log('timeline debug pin retained locally:', JSON.stringify(pin));
+      sendTimelineStatus('Pin cached locally');
+    });
+  }
 
   Pebble.addEventListener('appmessage', function(e) {
     var payload = (e && e.payload) ? e.payload : {};
-    if (typeof payload.lifetime_distance_m_total === 'number' || typeof payload.lifetime_calories_total === 'number' ||
-        typeof payload.last_activity_distance_m === 'number' || typeof payload.last_activity_timestamp === 'number') {
+    console.log('appmessage payload:', JSON.stringify(payload));
+    if (hasAny(payload, [
+      'insert_timeline_pin',
+      'lifetime_distance_m_total', 'lifetime_calories_total',
+      'last_activity_distance_m', 'last_activity_calories',
+      'last_activity_pace_sec', 'last_activity_timestamp',
+      '10020', '10022', '10023', '10024', '10025', '10026', '10027'
+    ])) {
       var s = loadSettings();
-      if (typeof payload.lifetime_distance_m_total === 'number') {
-        s.lifetime_distance_m_total = payload.lifetime_distance_m_total;
+      var prevTimestamp = s.last_activity_timestamp || 0;
+      var insertTimelinePinRequested = readIntFromPayload(payload, 'insert_timeline_pin', 10020, 0) === 1;
+      s.lifetime_distance_m_total = readIntFromPayload(payload, 'lifetime_distance_m_total', 10022, s.lifetime_distance_m_total || 0);
+      s.lifetime_calories_total = readIntFromPayload(payload, 'lifetime_calories_total', 10023, s.lifetime_calories_total || 0);
+      s.last_activity_distance_m = readIntFromPayload(payload, 'last_activity_distance_m', 10024, s.last_activity_distance_m || 0);
+      s.last_activity_calories = readIntFromPayload(payload, 'last_activity_calories', 10025, s.last_activity_calories || 0);
+      s.last_activity_pace_sec = readIntFromPayload(payload, 'last_activity_pace_sec', 10026, s.last_activity_pace_sec || 0);
+      s.last_activity_timestamp = readIntFromPayload(payload, 'last_activity_timestamp', 10027, s.last_activity_timestamp || 0);
+      var isNewSave = s.last_activity_timestamp > prevTimestamp && s.last_activity_timestamp > 0;
+      var shouldInsertTimelinePin = (insertTimelinePinRequested || isNewSave) && s.last_activity_timestamp > 0;
+      s = normalizeSettings(s);
+      s_latestSettingsSnapshot = s;
+      saveSettings(s);
+      console.log('saved totals snapshot:', JSON.stringify({
+        lifetime_distance_m_total: s.lifetime_distance_m_total,
+        lifetime_calories_total: s.lifetime_calories_total,
+        last_activity_distance_m: s.last_activity_distance_m,
+        last_activity_calories: s.last_activity_calories,
+        last_activity_pace_sec: s.last_activity_pace_sec,
+        last_activity_timestamp: s.last_activity_timestamp
+      }));
+      if (shouldInsertTimelinePin) {
+        console.log('timeline pin requested, inserting timeline pin');
+        insertTimelinePin(s);
       }
-      if (typeof payload.lifetime_calories_total === 'number') {
-        s.lifetime_calories_total = payload.lifetime_calories_total;
-      }
-      if (typeof payload.last_activity_distance_m === 'number') {
-        s.last_activity_distance_m = payload.last_activity_distance_m;
-      }
-      if (typeof payload.last_activity_calories === 'number') {
-        s.last_activity_calories = payload.last_activity_calories;
-      }
-      if (typeof payload.last_activity_pace_sec === 'number') {
-        s.last_activity_pace_sec = payload.last_activity_pace_sec;
-      }
-      if (typeof payload.last_activity_timestamp === 'number') {
-        s.last_activity_timestamp = payload.last_activity_timestamp;
-      }
-      saveSettings(normalizeSettings(s));
       if (s_waitingLifetimeCallback) {
         s_waitingLifetimeCallback();
       }
@@ -392,6 +541,24 @@
       }
     }
     console.log('config parsed, sending to watch');
-    syncSettingsToWatch(settings);
+    // Never allow config form submit to clobber live totals/last-activity snapshots.
+    var current = normalizeSettings(loadSettings());
+    var incoming = normalizeSettings(settings);
+    var merged = Object.assign({}, incoming);
+    merged.lifetime_distance_m_total = Math.max(current.lifetime_distance_m_total, incoming.lifetime_distance_m_total);
+    merged.lifetime_calories_total = Math.max(current.lifetime_calories_total, incoming.lifetime_calories_total);
+    if (incoming.last_activity_timestamp >= current.last_activity_timestamp) {
+      merged.last_activity_distance_m = incoming.last_activity_distance_m;
+      merged.last_activity_calories = incoming.last_activity_calories;
+      merged.last_activity_pace_sec = incoming.last_activity_pace_sec;
+      merged.last_activity_timestamp = incoming.last_activity_timestamp;
+    } else {
+      merged.last_activity_distance_m = current.last_activity_distance_m;
+      merged.last_activity_calories = current.last_activity_calories;
+      merged.last_activity_pace_sec = current.last_activity_pace_sec;
+      merged.last_activity_timestamp = current.last_activity_timestamp;
+    }
+    s_latestSettingsSnapshot = normalizeSettings(merged);
+    syncSettingsToWatch(s_latestSettingsSnapshot);
   });
 })();

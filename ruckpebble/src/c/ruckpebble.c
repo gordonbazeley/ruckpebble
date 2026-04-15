@@ -7,38 +7,6 @@
 #define MESSAGE_KEY_sim_steps_spm 9
 #endif
 
-// Keep builds compatible when package messageKeys are stale/missing in some environments.
-#ifndef MESSAGE_KEY_profile1_terrain_type
-#define MESSAGE_KEY_profile1_terrain_type 0x7FFFFFF0
-#endif
-#ifndef MESSAGE_KEY_profile2_terrain_type
-#define MESSAGE_KEY_profile2_terrain_type 0x7FFFFFF1
-#endif
-#ifndef MESSAGE_KEY_profile3_terrain_type
-#define MESSAGE_KEY_profile3_terrain_type 0x7FFFFFF2
-#endif
-#ifndef MESSAGE_KEY_request_lifetime_totals
-#define MESSAGE_KEY_request_lifetime_totals 0x7FFFFFF3
-#endif
-#ifndef MESSAGE_KEY_lifetime_distance_m_total
-#define MESSAGE_KEY_lifetime_distance_m_total 0x7FFFFFF4
-#endif
-#ifndef MESSAGE_KEY_lifetime_calories_total
-#define MESSAGE_KEY_lifetime_calories_total 0x7FFFFFF5
-#endif
-#ifndef MESSAGE_KEY_last_activity_distance_m
-#define MESSAGE_KEY_last_activity_distance_m 0x7FFFFFE0
-#endif
-#ifndef MESSAGE_KEY_last_activity_calories
-#define MESSAGE_KEY_last_activity_calories 0x7FFFFFE1
-#endif
-#ifndef MESSAGE_KEY_last_activity_pace_sec
-#define MESSAGE_KEY_last_activity_pace_sec 0x7FFFFFE2
-#endif
-#ifndef MESSAGE_KEY_last_activity_timestamp
-#define MESSAGE_KEY_last_activity_timestamp 0x7FFFFFE3
-#endif
-
 #define PROFILE_COUNT 3
 #define PROFILE_NAME_MAX_LEN 33
 #define TERRAIN_TYPE_MAX_LEN 16
@@ -157,6 +125,7 @@ static int32_t s_last_activity_calories   = 0;
 static int32_t s_last_activity_pace_sec   = 0;
 static int32_t s_last_activity_timestamp  = 0;
 static int32_t s_session_pace_sec         = 0;
+static char s_status_text[64] = "Saving ruck...";
 
 #define EMULATOR_TIME_SCALE 10
 
@@ -180,6 +149,9 @@ static int32_t prv_active_profile_index(void) {
   }
   return s_settings.active_profile;
 }
+
+static void prv_status_timer_callback(void *context);
+static void prv_show_status_message(const char *text, uint32_t duration_ms);
 
 static void prv_set_profile_name(int32_t profile_index, const char *name) {
   if (profile_index < 0 || profile_index >= PROFILE_COUNT) {
@@ -398,7 +370,31 @@ static void prv_save_settings(void) {
   persist_write_data(SETTINGS_PERSIST_KEY, &s_settings, sizeof(s_settings));
 }
 
-static void prv_send_lifetime_totals(void) {
+static void prv_show_status_message(const char *text, uint32_t duration_ms) {
+  if (!text || text[0] == '\0') {
+    text = "Saving ruck...";
+  }
+  strncpy(s_status_text, text, sizeof(s_status_text) - 1);
+  s_status_text[sizeof(s_status_text) - 1] = '\0';
+
+  if (s_status_text_layer) {
+    text_layer_set_text(s_status_text_layer, s_status_text);
+  }
+
+  if (!window_stack_contains_window(s_status_window)) {
+    window_stack_push(s_status_window, true);
+  }
+  if (s_status_timer) {
+    app_timer_cancel(s_status_timer);
+  }
+  s_status_timer = app_timer_register(duration_ms, prv_status_timer_callback, NULL);
+}
+
+static void prv_send_lifetime_totals(bool insert_timeline_pin) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "prv_send_lifetime_totals: dist=%ld cal=%ld last_dist=%ld last_ts=%ld insert_pin=%d",
+    (long)s_last_activity_distance_m, (long)s_last_activity_calories,
+    (long)s_last_activity_distance_m, (long)s_last_activity_timestamp,
+    (int)insert_timeline_pin);
   DictionaryIterator *iter = NULL;
   AppMessageResult result = app_message_outbox_begin(&iter);
   if (result != APP_MSG_OK || !iter) {
@@ -411,11 +407,12 @@ static void prv_send_lifetime_totals(void) {
   dict_write_int32(iter, MESSAGE_KEY_last_activity_calories,   s_last_activity_calories);
   dict_write_int32(iter, MESSAGE_KEY_last_activity_pace_sec,   s_last_activity_pace_sec);
   dict_write_int32(iter, MESSAGE_KEY_last_activity_timestamp,  s_last_activity_timestamp);
+  if (insert_timeline_pin) {
+    dict_write_int32(iter, MESSAGE_KEY_insert_timeline_pin, 1);
+  }
   dict_write_end(iter);
   result = app_message_outbox_send();
-  if (result != APP_MSG_OK) {
-    APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed for totals: %d", (int)result);
-  }
+  APP_LOG(APP_LOG_LEVEL_INFO, "prv_send_lifetime_totals: send result=%d", (int)result);
 }
 
 static void prv_commit_session_totals(const char *reason) {
@@ -531,7 +528,7 @@ static void prv_update_display(void) {
   int64_t walk_kcal_total = (walk_kcal_per_hour * elapsed_s) / 3600;
 
   static char top_time_buf[16];
-  static char distance_buf[16];
+  static char distance_buf[20];
   static char profile_name_buf[24];
   static char pace_header_buf[16];
   static char pace_value_buf[16];
@@ -558,8 +555,8 @@ static void prv_update_display(void) {
     snprintf(pace_header_buf, sizeof(pace_header_buf), "--:--/%s", distance_unit_label);
     snprintf(pace_value_buf, sizeof(pace_value_buf), "--:--");
   }
-  snprintf(distance_buf, sizeof(distance_buf), "%ld.%02ld%s",
-           (long)(distance_x100 / 100), (long)labs(distance_x100 % 100), distance_unit_label);
+  snprintf(distance_buf, sizeof(distance_buf), "%lld.%02lld%s",
+           (long long)(distance_x100 / 100), (long long)llabs(distance_x100 % 100), distance_unit_label);
   snprintf(timer_value_buf, sizeof(timer_value_buf), "%ld:%02ld",
            (long)(elapsed_s / 60), (long)(elapsed_s % 60));
   snprintf(steps_value_buf, sizeof(steps_value_buf), "%ld", (long)steps);
@@ -711,7 +708,12 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   }
   t = dict_find(iter, MESSAGE_KEY_request_lifetime_totals);
   if (t && t->value->int32 == 1) {
-    prv_send_lifetime_totals();
+    prv_send_lifetime_totals(false);
+  }
+  t = dict_find(iter, MESSAGE_KEY_timeline_status_text);
+  if (t && t->type == TUPLE_CSTRING) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "Timeline status: %s", t->value->cstring);
+    prv_show_status_message(t->value->cstring, 2200);
   }
 
   prv_save_settings();
@@ -770,9 +772,9 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   }
   ProfileSettings *p = &s_settings.profiles[row];
   static char legacy_title[16];
-  static char weight_value[12];
+  static char weight_value[16];
   static char terrain_value[12];
-  static char grade_value[8];
+  static char grade_value[12];
   const char *title_text = legacy_title;
   const char *weight_unit = (s_settings.ruck_weight_unit == 1) ? "lb" : "kg";
   const int16_t y = 0;
@@ -927,13 +929,11 @@ static void prv_main_down_click_handler(ClickRecognizerRef recognizer, void *con
   persist_write_int(LAST_ACTIVITY_TIMESTAMP_PERSIST_KEY,  s_last_activity_timestamp);
   // Commit session to lifetime totals
   prv_commit_session_totals("save");
+  // Proactively push last activity + lifetime totals to phone JS
+  prv_send_lifetime_totals(true);
   vibes_short_pulse();
   // Show brief status message then navigate to profile selection
-  window_stack_push(s_status_window, true);
-  if (s_status_timer) {
-    app_timer_cancel(s_status_timer);
-  }
-  s_status_timer = app_timer_register(1500, prv_status_timer_callback, NULL);
+  prv_show_status_message("Saving ruck...", 1500);
 }
 
 static uint16_t prv_music_get_num_rows_callback(MenuLayer *menu_layer, uint16_t section_index, void *context) {
@@ -997,7 +997,7 @@ static void prv_status_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
   s_status_text_layer = text_layer_create(bounds);
-  text_layer_set_text(s_status_text_layer, "Saving ruck...");
+  text_layer_set_text(s_status_text_layer, s_status_text);
   text_layer_set_text_alignment(s_status_text_layer, GTextAlignmentCenter);
   text_layer_set_font(s_status_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
   text_layer_set_background_color(s_status_text_layer, GColorBlack);
