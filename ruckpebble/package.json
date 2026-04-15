@@ -1,13 +1,13 @@
 {
-  "name": "ruckpebble",
+  "name": "RuckPebble",
   "author": "ModusApps",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "keywords": ["pebble-app"],
   "private": true,
   "dependencies": {},
   "pebble": {
-    "displayName": "ruckpebble",
-    "uuid": "E078CE1C-3C93-459F-AA3C-B5390977C663",
+    "displayName": "RuckPebble",
+    "uuid": "e078ce1c-3c93-459f-aa3c-b5390977c663",
     "sdkVersion": "3",
     "enableMultiJS": true,
     "targetPlatforms": [
