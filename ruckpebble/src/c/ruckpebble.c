@@ -1034,6 +1034,8 @@ static void prv_profile_window_load(Window *window) {
   GRect menu_bounds = GRect(SCREEN_PADDING, SCREEN_PADDING,
                             bounds.size.w - (2 * SCREEN_PADDING), menu_height);
   s_profile_menu_layer = menu_layer_create(menu_bounds);
+  menu_layer_set_click_config_onto_window(s_profile_menu_layer, window);
+  window_set_click_config_provider(window, prv_profile_click_config_provider);
   menu_layer_set_callbacks(s_profile_menu_layer, NULL, (MenuLayerCallbacks) {
     .get_num_rows = prv_profile_get_num_rows_callback,
     .get_cell_height = prv_profile_get_cell_height_callback,
@@ -1205,7 +1207,6 @@ static void prv_init(void) {
   });
 
   s_profile_window = window_create();
-  window_set_click_config_provider(s_profile_window, prv_profile_click_config_provider);
   window_set_window_handlers(s_profile_window, (WindowHandlers) {
     .load = prv_profile_window_load,
     .unload = prv_profile_window_unload,
