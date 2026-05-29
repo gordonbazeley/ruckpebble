@@ -62,18 +62,18 @@ static const Settings SETTINGS_DEFAULTS = {
   .active_profile = 0,
   .profiles = {
     { .ruck_weight_value = 300, .terrain_factor = 100, .grade_percent = 0 },
-    { .ruck_weight_value = 150, .terrain_factor = 120, .grade_percent = 100 },
-    { .ruck_weight_value = 300, .terrain_factor = 130, .grade_percent = 0 }
+    { .ruck_weight_value = 300, .terrain_factor = 100, .grade_percent = 0 },
+    { .ruck_weight_value = 150, .terrain_factor = 100, .grade_percent = 0 }
   },
   .profile_names = {
     "30lb, road",
-    "15lb, trail, hilly",
-    ""
+    "30lb, hilly",
+    "15lb, road"
   },
   .profile_terrain_types = {
     "road",
-    "gravel",
-    "mixed"
+    "road",
+    "road"
   }
 };
 
