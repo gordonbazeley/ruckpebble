@@ -105,6 +105,7 @@ static int16_t s_profile_cell_height = PROFILE_ROW_HEIGHT;
 static Settings s_settings;
 static time_t s_start_time;
 static bool s_health_available = false;
+static bool s_health_subscribed = false;
 static time_t s_day_start;
 static int32_t s_steps_baseline = 0;
 static int32_t s_last_steps = 0;
@@ -147,6 +148,40 @@ static int32_t prv_active_profile_index(void) {
 
 static void prv_status_timer_callback(void *context);
 static void prv_show_status_message(const char *text, uint32_t duration_ms);
+static void prv_health_handler(HealthEventType event, void *context);
+
+static bool prv_step_count_available(time_t now) {
+  HealthServiceAccessibilityMask access = health_service_metric_accessible(HealthMetricStepCount, s_day_start, now);
+  return (access & HealthServiceAccessibilityMaskAvailable);
+}
+
+static void prv_ensure_health_subscription(time_t now) {
+  bool available = prv_step_count_available(now);
+  if (available && !s_health_subscribed) {
+    health_service_events_subscribe(prv_health_handler, NULL);
+    s_health_subscribed = true;
+  }
+  s_health_available = available;
+}
+
+static int32_t prv_current_step_count(time_t now) {
+  (void)now;
+  if (!s_health_available) {
+    return 0;
+  }
+
+  HealthValue steps = health_service_peek_current_value(HealthMetricStepCount);
+  if (steps <= 0) {
+    steps = health_service_sum_today(HealthMetricStepCount);
+  }
+  if (steps < 0) {
+    return 0;
+  }
+  if (steps > INT32_MAX) {
+    return INT32_MAX;
+  }
+  return (int32_t)steps;
+}
 
 static void prv_set_profile_name(int32_t profile_index, const char *name) {
   if (profile_index < 0 || profile_index >= PROFILE_COUNT) {
@@ -443,6 +478,7 @@ static void prv_update_display(void) {
     return;
   }
   time_t now = time(NULL);
+  prv_ensure_health_subscription(now);
   int64_t elapsed_real_s = (int64_t)(now - s_start_time);
   if (elapsed_real_s < 1) {
     elapsed_real_s = 1;
@@ -454,14 +490,7 @@ static void prv_update_display(void) {
 
   int32_t steps = 0;
   int32_t steps_total_day = 0;
-  if (s_health_available) {
-    // peek_current_value updates more frequently than health_service_sum (which batches ~1min)
-    HealthValue peeked = health_service_peek_current_value(HealthMetricStepCount);
-    steps_total_day = (peeked > 0) ? (int32_t)peeked : 0;
-    if (steps_total_day < 0) {
-      steps_total_day = 0;
-    }
-  }
+  steps_total_day = prv_current_step_count(now);
   if (s_health_available) {
     steps = steps_total_day - s_steps_baseline;
     if (steps < 0) {
@@ -548,12 +577,18 @@ static void prv_update_display(void) {
   }
   snprintf(distance_buf, sizeof(distance_buf), "%lld.%02lld%s",
            (long long)(distance_x100 / 100), (long long)llabs(distance_x100 % 100), distance_unit_label);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "sim=%ld elapsed_real=%ld elapsed_s=%ld",
-          (long)s_settings.sim_steps_enabled, (long)elapsed_real_s, (long)elapsed_s);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "sim=%ld health=%d baseline=%ld steps=%ld total=%ld elapsed_real=%ld elapsed_s=%ld",
+          (long)s_settings.sim_steps_enabled, (int)s_health_available,
+          (long)s_steps_baseline, (long)steps, (long)steps_total_day,
+          (long)elapsed_real_s, (long)elapsed_s);
   snprintf(timer_value_buf, sizeof(timer_value_buf), "%ld:%02ld",
            (long)(elapsed_s / 60), (long)(elapsed_s % 60));
   snprintf(steps_value_buf, sizeof(steps_value_buf), "%ld", (long)steps);
-  snprintf(steps_total_value_buf, sizeof(steps_total_value_buf), "%ld", (long)steps_total_day);
+  if (s_health_available) {
+    snprintf(steps_total_value_buf, sizeof(steps_total_value_buf), "%ld", (long)steps_total_day);
+  } else {
+    snprintf(steps_total_value_buf, sizeof(steps_total_value_buf), "No Health");
+  }
   snprintf(calories_value_buf, sizeof(calories_value_buf), "%ld", (long)ruck_kcal_total);
   snprintf(calories_walk_value_buf, sizeof(calories_walk_value_buf), "%ld", (long)walk_kcal_total);
 
@@ -737,12 +772,15 @@ static void prv_start_session(void) {
   s_session_distance_m = 0;
   s_session_calories = 0;
   s_session_totals_committed = false;
+  time_t now = time(NULL);
+  prv_ensure_health_subscription(now);
   if (s_health_available) {
-    HealthValue peeked = health_service_peek_current_value(HealthMetricStepCount);
-    s_steps_baseline = (peeked > 0) ? (int32_t)peeked : 0;
+    s_steps_baseline = prv_current_step_count(now);
   } else {
     s_steps_baseline = 0;
   }
+  APP_LOG(APP_LOG_LEVEL_INFO, "Session start: health_available=%d baseline=%ld",
+          (int)s_health_available, (long)s_steps_baseline);
 }
 
 static uint16_t prv_profile_get_num_rows_callback(MenuLayer *menu_layer, uint16_t section_index, void *context) {
@@ -1231,11 +1269,7 @@ static void prv_init(void) {
   } else {
     s_day_start = now;
   }
-  HealthServiceAccessibilityMask access = health_service_metric_accessible(HealthMetricStepCount, now, now);
-  s_health_available = (access & HealthServiceAccessibilityMaskAvailable);
-  if (s_health_available) {
-    health_service_events_subscribe(prv_health_handler, NULL);
-  }
+  prv_ensure_health_subscription(now);
 
   tick_timer_service_subscribe(SECOND_UNIT, prv_tick_handler);
 
@@ -1252,8 +1286,9 @@ static void prv_init(void) {
 static void prv_deinit(void) {
   prv_commit_session_totals("deinit");
   tick_timer_service_unsubscribe();
-  if (s_health_available) {
+  if (s_health_subscribed) {
     health_service_events_unsubscribe();
+    s_health_subscribed = false;
   }
   if (s_status_timer) {
     app_timer_cancel(s_status_timer);
