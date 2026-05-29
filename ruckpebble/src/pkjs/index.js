@@ -9,7 +9,8 @@
   var KEY_LAST_ACTIVITY_DISTANCE_M = 10025;
   var KEY_LAST_ACTIVITY_CALORIES = 10026;
   var KEY_LAST_ACTIVITY_PACE_SEC = 10027;
-  var KEY_LAST_ACTIVITY_TIMESTAMP = 10028;
+  var KEY_LAST_ACTIVITY_DURATION_SEC = 10028;
+  var KEY_LAST_ACTIVITY_TIMESTAMP = 10029;
 
   var defaults = {
     weight_value: 800,
@@ -40,6 +41,7 @@
     last_activity_distance_m: 0,
     last_activity_calories: 0,
     last_activity_pace_sec: 0,
+    last_activity_duration_sec: 0,
     last_activity_timestamp: 0
   };
   var s_waitingLifetimeCallback = null;
@@ -134,6 +136,7 @@
     out.last_activity_distance_m = parseInt(out.last_activity_distance_m, 10) || 0;
     out.last_activity_calories = parseInt(out.last_activity_calories, 10) || 0;
     out.last_activity_pace_sec = parseInt(out.last_activity_pace_sec, 10) || 0;
+    out.last_activity_duration_sec = parseInt(out.last_activity_duration_sec, 10) || 0;
     out.last_activity_timestamp = parseInt(out.last_activity_timestamp, 10) || 0;
     return out;
   }
@@ -403,7 +406,7 @@
       'if(ts>0){var _d=new Date(ts*1000);var _day=_d.getDate();var _sfx=["th","st","nd","rd"];var _v=_day%100;var _ord=_sfx[(_v-20)%10]||_sfx[_v]||_sfx[0];var _mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][_d.getMonth()];$("last_activity_datetime").textContent=_day+_ord+" "+_mo+" "+("0"+_d.getHours()).slice(-2)+":"+("0"+_d.getMinutes()).slice(-2);}else{$("last_activity_datetime").textContent="--";}' +
       '$("last_activity_distance_km").textContent=formatKmFromMeters(cfg.last_activity_distance_m||0);' +
       'var ps=parseInt(cfg.last_activity_pace_sec,10)||0;' +
-      '$("last_activity_pace").textContent=ps>0?Math.floor(ps/60)+":"+(("0"+(ps%60)).slice(-2))+" /km":"--";' +
+      '$("last_activity_pace").textContent=ps>0?Math.floor(ps/60)+":"+(("0"+(ps%60)).slice(-2))+" / km":"--";' +
       '$("last_activity_calories_display").textContent=formatNumber(cfg.last_activity_calories||0);' +
       'updateRuckWeightLabels();' +
       '}' +
@@ -471,19 +474,24 @@
   function buildTimelinePin(activity) {
     var ts = activity.last_activity_timestamp;
     var pinId = 'ruck-' + ts;
-    var pinTime = new Date(ts * 1000).toISOString();
+    var pinTime = new Date((Date.now() + 120000)).toISOString();
 
     var distKm = (activity.last_activity_distance_m / 1000).toFixed(2);
     var cal = activity.last_activity_calories;
     var paceSec = activity.last_activity_pace_sec;
-    var subtitle = distKm + ' km';
-    if (cal > 0) { subtitle += ' \u00b7 ' + cal + ' kcal'; }
-    var body = paceSec > 0
-      ? 'Pace: ' + Math.floor(paceSec / 60) + ':' + ('0' + (paceSec % 60)).slice(-2) + ' /km'
-      : '';
+    var durationSec = parseInt(activity.last_activity_duration_sec, 10) || 0;
+    var bodyLines = [];
+    bodyLines.push(distKm + ' km' + (cal > 0 ? ' \u00b7 ' + cal + ' kcal' : ''));
+    if (paceSec > 0) {
+      bodyLines.push('Pace: ' + Math.floor(paceSec / 60) + ':' + ('0' + (paceSec % 60)).slice(-2) + ' / km');
+    }
+    if (durationSec > 0) {
+      var durationMin = Math.max(1, Math.round(durationSec / 60));
+      bodyLines.push(durationMin + (durationMin === 1 ? ' minute' : ' minutes'));
+    }
 
-    var layout = { type: 'genericPin', title: 'Ruck complete', subtitle: subtitle };
-    if (body) { layout.body = body; }
+    var layout = { type: 'genericPin', title: 'Ruck complete' };
+    if (bodyLines.length) { layout.body = bodyLines.join('\n'); }
     return { id: pinId, time: pinTime, layout: layout };
   }
 
@@ -508,7 +516,7 @@
       xhr.onload = function() {
         console.log('timeline pin response:', xhr.status, xhr.responseText);
         if (xhr.status >= 200 && xhr.status < 300) {
-          sendTimelineStatus('Timeline saved');
+          sendTimelineStatus('Ruck saved to timeline and phone settings');
         } else {
           sendTimelineStatus('Timeline HTTP ' + xhr.status);
         }
@@ -532,11 +540,12 @@
       'insert_timeline_pin',
       'lifetime_distance_m_total', 'lifetime_calories_total',
       'last_activity_distance_m', 'last_activity_calories',
-      'last_activity_pace_sec', 'last_activity_timestamp',
+      'last_activity_pace_sec', 'last_activity_duration_sec', 'last_activity_timestamp',
       String(KEY_INSERT_TIMELINE_PIN),
       String(KEY_LIFETIME_DISTANCE_M_TOTAL), String(KEY_LIFETIME_CALORIES_TOTAL),
       String(KEY_LAST_ACTIVITY_DISTANCE_M), String(KEY_LAST_ACTIVITY_CALORIES),
-      String(KEY_LAST_ACTIVITY_PACE_SEC), String(KEY_LAST_ACTIVITY_TIMESTAMP)
+      String(KEY_LAST_ACTIVITY_PACE_SEC), String(KEY_LAST_ACTIVITY_DURATION_SEC),
+      String(KEY_LAST_ACTIVITY_TIMESTAMP)
     ])) {
       var s = loadSettings();
       var prevTimestamp = s.last_activity_timestamp || 0;
@@ -546,6 +555,7 @@
       s.last_activity_distance_m = readIntFromPayload(payload, 'last_activity_distance_m', KEY_LAST_ACTIVITY_DISTANCE_M, s.last_activity_distance_m || 0);
       s.last_activity_calories = readIntFromPayload(payload, 'last_activity_calories', KEY_LAST_ACTIVITY_CALORIES, s.last_activity_calories || 0);
       s.last_activity_pace_sec = readIntFromPayload(payload, 'last_activity_pace_sec', KEY_LAST_ACTIVITY_PACE_SEC, s.last_activity_pace_sec || 0);
+      s.last_activity_duration_sec = readIntFromPayload(payload, 'last_activity_duration_sec', KEY_LAST_ACTIVITY_DURATION_SEC, s.last_activity_duration_sec || 0);
       s.last_activity_timestamp = readIntFromPayload(payload, 'last_activity_timestamp', KEY_LAST_ACTIVITY_TIMESTAMP, s.last_activity_timestamp || 0);
       var isNewSave = s.last_activity_timestamp > prevTimestamp && s.last_activity_timestamp > 0;
       var shouldInsertTimelinePin = (insertTimelinePinRequested || isNewSave) && s.last_activity_timestamp > 0;
@@ -558,6 +568,7 @@
         last_activity_distance_m: s.last_activity_distance_m,
         last_activity_calories: s.last_activity_calories,
         last_activity_pace_sec: s.last_activity_pace_sec,
+        last_activity_duration_sec: s.last_activity_duration_sec,
         last_activity_timestamp: s.last_activity_timestamp
       }));
       if (shouldInsertTimelinePin) {
@@ -599,11 +610,13 @@
       merged.last_activity_distance_m = incoming.last_activity_distance_m;
       merged.last_activity_calories = incoming.last_activity_calories;
       merged.last_activity_pace_sec = incoming.last_activity_pace_sec;
+      merged.last_activity_duration_sec = incoming.last_activity_duration_sec;
       merged.last_activity_timestamp = incoming.last_activity_timestamp;
     } else {
       merged.last_activity_distance_m = current.last_activity_distance_m;
       merged.last_activity_calories = current.last_activity_calories;
       merged.last_activity_pace_sec = current.last_activity_pace_sec;
+      merged.last_activity_duration_sec = current.last_activity_duration_sec;
       merged.last_activity_timestamp = current.last_activity_timestamp;
     }
     s_latestSettingsSnapshot = normalizeSettings(merged);

@@ -10,9 +10,7 @@ SCREEN_LAYOUTS = {
     "profile": {
         "canvas_size": (1500, 1000),
         "sections": {
-            "Profile 1": {"anchor": (34, 18), "box": (50, 175, 405), "side": "left"},
-            "Profile 2": {"anchor": (34, 86), "box": (1045, 338, 405), "side": "right"},
-            "Profile 3": {"anchor": (34, 154), "box": (50, 500, 405), "side": "left"},
+            "Profiles": {"anchor": (34, 86), "box": (50, 175, 405), "side": "left"},
         },
         "footer_box": (270, 884, 1230, 964),
     },
@@ -21,7 +19,7 @@ SCREEN_LAYOUTS = {
         "sections": {
             "Active Profile": {"anchor": (34, 18), "box": (50, 175, 405), "side": "left"},
             "Current Pace": {"anchor": (42, 56), "box": (50, 338, 405), "side": "left"},
-            "Pace Tile": {"anchor": (60, 100), "box": (50, 500, 405), "side": "left"},
+            "Pace": {"anchor": (60, 100), "box": (50, 500, 405), "side": "left"},
             "Steps": {"anchor": (58, 188), "box": (50, 675, 405), "side": "left"},
             "Watch Time": {"anchor": (172, 20), "box": (1045, 175, 405), "side": "right"},
             "Distance": {"anchor": (164, 56), "box": (1045, 338, 405), "side": "right"},
@@ -253,7 +251,13 @@ def render_screen(doc, screenshot_path, output_path):
 
     header = doc["sections"].get("Header", {})
     draw.text((56, 40), header.get("title", doc["title"]), fill="#111111", font=f_title)
-    draw.text((58, 92), header.get("subtitle", ""), fill="#555555", font=f_subtitle)
+    header_subtitle = header.get("subtitle", "")
+    if header_subtitle:
+        header_lines = wrap_text(draw, header_subtitle, f_subtitle, canvas.width - 116)
+        yy = 92
+        for line in header_lines:
+            draw.text((58, yy), line, fill="#555555", font=f_subtitle)
+            yy += 24
 
     if screen_key == "settings":
         wx, wy, watch_w, watch_h = place_settings_mock(canvas, layout)
@@ -286,11 +290,17 @@ def render_screen(doc, screenshot_path, output_path):
     footer = doc["sections"].get("Footer", {})
     footer_box = layout["footer_box"]
     bx, by, bw, bh = footer_box
+    footer_subtitle = footer.get("subtitle", "")
+    footer_lines = wrap_text(draw, footer_subtitle, f_footer, bw - 60) if footer_subtitle else []
+    footer_height = 56 + max(1, len(footer_lines)) * 24
+    footer_box = (bx, by, bw, max(bh, by + footer_height))
     draw.rounded_rectangle(footer_box, radius=12, fill="#fff7f7", outline="#f0b0b0", width=2)
     draw.text((bx + 30, by + 12), footer.get("title", ""), fill="#7a2424", font=f_box_title)
-    footer_subtitle = footer.get("subtitle", "")
-    if footer_subtitle:
-        draw.text((bx + 30, by + 44), footer_subtitle, fill="#7a2424", font=f_footer)
+    if footer_lines:
+        yy = by + 44
+        for line in footer_lines:
+            draw.text((bx + 30, yy), line, fill="#7a2424", font=f_footer)
+            yy += 22
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(output_path)

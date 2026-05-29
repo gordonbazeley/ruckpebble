@@ -1,84 +1,85 @@
 # Profile Screen
 ## Header
-- title: Profile chooser
-- subtitle: Pick the active ruck profile before starting a session
+- title: Profile Selection
+- subtitle: You'll use more calories depending on the weight of your ruck, the terrain you're moving across and the gradient of your ruck.
+            Select a profile which matches today's ruck.
 
-## Profile 1
-- description: First selectable profile. Shows the profile name on the top line and the weight, terrain, and grade settings below it.
-
-## Profile 2
-- description: Second selectable profile with the same three settings. Use Up or Down to move the highlight here and Select to start with it.
-
-## Profile 3
-- description: Third selectable profile. The same row layout keeps the list easy to scan and compare.
+## Profiles
+- description: You can define up to three profiles which define ruck weight, terrain and gradient. They'll impact the number of calories burnt when rucking
+  Select one of them here.
 
 ## Footer
-- title: Select starts tracking
-- subtitle: Use Up and Down to move, Select to begin rucking with the highlighted profile, and Back to exit without starting.
+- title: How to use
+- subtitle: Up and Down - Move between profiles       
+            Select - Start ruck with the highlighted profile
+            Back - Exit to Pebble menu
 
 ---
 
 # Tracking Screen
 ## Header
-- title: RuckPebble Tracking Screen
-- subtitle: What each live field means while a ruck is in progress
+- title: Rucking Screen
+- subtitle: There's a lot happening here, this screenshot explains everything.
 
 ## Active Profile
-- description: Selected ruck profile. These settings drive ruck weight, terrain factor, grade, calorie maths and profile name.
+- description: Name of the profile selected on the profile screen.
 
 ## Current Pace
-- description: Live pace per kilometre or mile. Shows --:-- until distance has moved beyond zero.
+- description: Live pace per kilometre or mile.
 
-## Pace Tile
+## Pace
 - description: Large pace readout for the current session, repeated for scanability while moving.
 
 ## Steps
-- description: Top number is steps since this ruck started. Smaller number underneath is the watch's total steps for today.
+- description: The first line shows steps for the current ruck session. The second line shows total steps for today.
 
 ## Watch Time
-- description: Current watch time, kept visible so the tracking screen can replace your normal watchface during a ruck.
+- description: Current time.
 
 ## Distance
-- description: Total distance for this ruck, calculated from session steps multiplied by configured stride length.
+- description: Total distance for this ruck session.
 
 ## Heart Rate
 - description: Latest Pebble Health heart-rate reading when available. Shows -- when no recent reading exists.
 
 ## Elapsed Time
-- description: Timer for the active ruck session.
+- description: Time elapsed for the active ruck session.
 
 ## Calories
-- description: Top number is estimated loaded-ruck calories. Smaller number below is normal walking calories for comparison.
+- description: The first line shows the estimated calories for selected profile. The second line shows calories for an unweighted walk for comparison.
 
 ## Footer
-- title: Down button save
-- subtitle: Down button saves the current ruck snapshot and asks the phone companion to create a timeline pin.
+- title: How to use
+- subtitle: Up: Music
+            Down: Saves the current ruck session creates a timeline pin.
+            Back: Gives a choice between resuming current session and discarding it.
 
 ---
 
 # JavaScript Settings Page
 ## Header
 - title: Ruck Settings
-- subtitle: Shared watch settings, three profiles, totals, and the last activity summary
+- subtitle: Set up your ruck profiles.
 
 ## Shared
-- description: Phone-side settings for body weight, ruck weight unit, and stride length. These drive the calculations sent to the watch.
+- description: Settings for body weight, ruck weight unit, and stride length.
 
 ## Profile 1
-- description: First profile card. Sets the name, ruck weight, terrain, and grade used when this profile is selected on the watch.
+- description: Sets the name, ruck weight, terrain, and grade used when this profile is selected on the watch.
 
 ## Profile 2
-- description: Second profile card with the same fields as Profile 1. Use it for an alternate ruck setup such as trail or hilly terrain.
+- description: Second profile with the same fields as Profile 1. Use it for an alternate ruck setup such as a different ruck weight or terrain.
 
 ## Profile 3
-- description: Third profile card with the same fields as the other profiles. Keep it for another named setup or a default fallback.
+- description: Third profile card with the same fields as the other profiles. 
 
 ## Tracked Totals
-- description: Phone-side lifetime totals for distance and calories accumulated from all saved rucks.
+- description: Lifetime totals for distance and calories accumulated from all saved rucks.
 
 ## Last Activity
 - description: The most recent ruck saved from the watch, including date, distance, pace, and calories.
 
 ## Footer
-- title: Save and reset controls
-- subtitle: Save writes the settings back to the watch companion. Reset restores the default settings before saving.
+- title: How to use
+- subtitle: Save - Write the settings back to the watch 
+            Reset - Restores the default settings
