@@ -10,6 +10,7 @@
 #define PROFILE_ROW_SEPARATOR_HEIGHT 1
 #define PROFILE_GRADE_TEXT_WIDTH 30
 #define PROFILE_TERRAIN_BONUS_WIDTH 0
+#define PACE_HISTORY_SECONDS 60
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -135,8 +136,11 @@ static int32_t s_last_activity_pace_sec   = 0;
 static int32_t s_last_activity_duration_sec = 0;
 static int32_t s_last_activity_timestamp  = 0;
 static int32_t s_session_pace_sec         = 0;
+static int32_t s_current_pace_sec         = 0;
 static int32_t s_smoothed_pace_sec        = 0;
 static char s_status_text[64] = "Saving ruck...";
+static int32_t s_step_history[PACE_HISTORY_SECONDS];
+static time_t s_step_history_time[PACE_HISTORY_SECONDS];
 
 #define EMULATOR_TIME_SCALE 10
 
@@ -516,6 +520,11 @@ static void prv_update_display(void) {
 
   int64_t stride_mm = prv_stride_to_mm(s_settings.stride_value, s_settings.stride_unit);
   int64_t distance_mm = (int64_t)steps * stride_mm;
+  if (s_health_available) {
+    int history_index = (int)(now % PACE_HISTORY_SECONDS);
+    s_step_history_time[history_index] = now;
+    s_step_history[history_index] = steps_total_day;
+  }
   if (s_last_time == 0) {
     s_last_time = now;
     s_last_steps = steps;
@@ -545,33 +554,43 @@ static void prv_update_display(void) {
   const char *distance_unit_label = use_imperial ? "mi" : "km";
   int64_t distance_x100 = (distance_mm * 100) / unit_mm;
 
-  int64_t pace_sec = 0;
+  int64_t session_pace_display_sec = 0;
+  int64_t session_pace_storage_sec = 0;
   if (distance_mm > 0) {
-    pace_sec = (elapsed_s * unit_mm) / distance_mm;
+    session_pace_display_sec = (elapsed_s * unit_mm) / distance_mm;
+    session_pace_storage_sec = (elapsed_s * 1000000LL) / distance_mm;
   }
-  int64_t display_pace_sec = pace_sec;
-  if (speed_mmps > 0) {
-    int64_t speed_pace_sec = unit_mm / speed_mmps;
-    if (s_smoothed_pace_sec <= 0) {
-      s_smoothed_pace_sec = (int32_t)speed_pace_sec;
+  s_session_pace_sec = (int32_t)session_pace_storage_sec;
+
+  int64_t current_pace_sec = 0;
+  int64_t current_window_s = elapsed_real_s < PACE_HISTORY_SECONDS ? elapsed_real_s : PACE_HISTORY_SECONDS;
+  if (s_health_available && current_window_s > 0) {
+    int32_t window_start_steps = s_steps_baseline;
+    bool have_history = false;
+    if (elapsed_real_s >= PACE_HISTORY_SECONDS) {
+      time_t window_start_time = now - PACE_HISTORY_SECONDS;
+      int history_index = (int)(window_start_time % PACE_HISTORY_SECONDS);
+      if (s_step_history_time[history_index] == window_start_time) {
+        window_start_steps = s_step_history[history_index];
+        have_history = true;
+      }
     } else {
-      s_smoothed_pace_sec = (int32_t)(((int64_t)s_smoothed_pace_sec * 9 + speed_pace_sec) / 10);
+      have_history = true;
     }
-    display_pace_sec = s_smoothed_pace_sec;
-  } else if (display_pace_sec > 0) {
-    if (s_smoothed_pace_sec <= 0) {
-      s_smoothed_pace_sec = (int32_t)display_pace_sec;
-    } else {
-      s_smoothed_pace_sec = (int32_t)(((int64_t)s_smoothed_pace_sec * 9 + display_pace_sec) / 10);
+    if (have_history) {
+      int32_t window_steps = steps_total_day - window_start_steps;
+      if (window_steps < 0) {
+        window_steps = 0;
+      }
+      if (window_steps > 0) {
+        current_pace_sec = (current_window_s * unit_mm) / ((int64_t)window_steps * stride_mm);
+      }
     }
-    display_pace_sec = s_smoothed_pace_sec;
-  } else {
-    s_smoothed_pace_sec = 0;
   }
-  // Always track pace in seconds per km for last-activity storage
-  if (distance_mm > 0) {
-    s_session_pace_sec = (int32_t)((elapsed_s * 1000000LL) / distance_mm);
+  if (current_pace_sec <= 0) {
+    current_pace_sec = session_pace_display_sec;
   }
+  s_current_pace_sec = (int32_t)current_pace_sec;
 
   ProfileSettings *profile = prv_active_profile();
   int64_t weight_kg1000 = prv_weight_to_kg1000(s_settings.weight_value, s_settings.weight_unit);
@@ -585,9 +604,20 @@ static void prv_update_display(void) {
   }
   int64_t metabolic_mw = prv_pandolf_metabolic_mw(weight_kg1000, load_kg1000, session_speed_mmps);
   int64_t ruck_kcal_per_hour = (metabolic_mw * 3600) / 4184 / 1000;
-  int64_t ruck_kcal_total = (ruck_kcal_per_hour * elapsed_s) / 3600;
   int64_t walk_kcal_per_hour = prv_walking_kcal_per_hour(weight_kg1000, session_speed_mmps);
   int64_t walk_kcal_total = (walk_kcal_per_hour * elapsed_s) / 3600;
+  int64_t load_ratio_q1000 = 0;
+  if (weight_kg1000 > 0) {
+    load_ratio_q1000 = (load_kg1000 * 1000) / weight_kg1000;
+  }
+  if (load_kg1000 > 0 && ruck_kcal_per_hour < walk_kcal_per_hour) {
+    int64_t load_bonus_kcal_per_hour = (walk_kcal_per_hour * load_ratio_q1000) / 1000;
+    if (load_bonus_kcal_per_hour < 1) {
+      load_bonus_kcal_per_hour = 1;
+    }
+    ruck_kcal_per_hour = walk_kcal_per_hour + load_bonus_kcal_per_hour;
+  }
+  int64_t ruck_kcal_total = (ruck_kcal_per_hour * elapsed_s) / 3600;
 
   static char top_time_buf[16];
   static char distance_buf[20];
@@ -608,13 +638,18 @@ static void prv_update_display(void) {
   } else {
     snprintf(top_time_buf, sizeof(top_time_buf), "--:--");
   }
-  if (display_pace_sec > 0) {
-    int pace_min = (int)(display_pace_sec / 60);
-    int pace_rem = (int)(display_pace_sec % 60);
+  if (session_pace_display_sec > 0) {
+    int pace_min = (int)(session_pace_display_sec / 60);
+    int pace_rem = (int)(session_pace_display_sec % 60);
     snprintf(pace_header_buf, sizeof(pace_header_buf), "%d:%02d/%s", pace_min, pace_rem, distance_unit_label);
-    snprintf(pace_value_buf, sizeof(pace_value_buf), "%d:%02d", pace_min, pace_rem);
   } else {
     snprintf(pace_header_buf, sizeof(pace_header_buf), "--:--/%s", distance_unit_label);
+  }
+  if (current_pace_sec > 0) {
+    int pace_min = (int)(current_pace_sec / 60);
+    int pace_rem = (int)(current_pace_sec % 60);
+    snprintf(pace_value_buf, sizeof(pace_value_buf), "%d:%02d", pace_min, pace_rem);
+  } else {
     snprintf(pace_value_buf, sizeof(pace_value_buf), "--:--");
   }
   snprintf(distance_buf, sizeof(distance_buf), "%lld.%02lld%s",
@@ -824,10 +859,14 @@ static void prv_reset_session_state(void) {
   s_last_time = 0;
   s_last_steps = 0;
   s_speed_mmps = 0;
-  s_smoothed_pace_sec = 0;
   s_session_distance_m = 0;
   s_session_calories = 0;
   s_session_totals_committed = false;
+  s_session_pace_sec = 0;
+  s_current_pace_sec = 0;
+  s_smoothed_pace_sec = 0;
+  memset(s_step_history, 0, sizeof(s_step_history));
+  memset(s_step_history_time, 0, sizeof(s_step_history_time));
 }
 
 static uint16_t prv_profile_get_num_rows_callback(MenuLayer *menu_layer, uint16_t section_index, void *context) {
