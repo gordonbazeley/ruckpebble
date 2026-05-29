@@ -2,11 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef MESSAGE_KEY_sim_steps_enabled
-#define MESSAGE_KEY_sim_steps_enabled 8
-#define MESSAGE_KEY_sim_steps_spm 9
-#endif
-
 #define PROFILE_COUNT 3
 #define PROFILE_NAME_MAX_LEN 33
 #define TERRAIN_TYPE_MAX_LEN 16
@@ -1247,7 +1242,7 @@ static void prv_init(void) {
   app_message_register_inbox_received(prv_inbox_received_handler);
   app_message_register_inbox_dropped(prv_inbox_dropped_handler);
   app_message_register_outbox_failed(prv_outbox_failed_handler);
-  app_message_open(1024, 128);
+  app_message_open(1024, 512);
   APP_LOG(APP_LOG_LEVEL_INFO, "App initialized, waiting for config updates");
 
   window_stack_push(s_window, false);

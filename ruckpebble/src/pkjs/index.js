@@ -2,6 +2,14 @@
 (function() {
   var SETTINGS_KEY = 'ruck_settings_v2';
   var DEBUG_TIMELINE_PIN_KEY = 'ruck_debug_timeline_pin_v1';
+  var KEY_INSERT_TIMELINE_PIN = 10020;
+  var KEY_REQUEST_LIFETIME_TOTALS = 10022;
+  var KEY_LIFETIME_DISTANCE_M_TOTAL = 10023;
+  var KEY_LIFETIME_CALORIES_TOTAL = 10024;
+  var KEY_LAST_ACTIVITY_DISTANCE_M = 10025;
+  var KEY_LAST_ACTIVITY_CALORIES = 10026;
+  var KEY_LAST_ACTIVITY_PACE_SEC = 10027;
+  var KEY_LAST_ACTIVITY_TIMESTAMP = 10028;
 
   var defaults = {
     weight_value: 800,
@@ -32,11 +40,23 @@
     last_activity_distance_m: 0,
     last_activity_calories: 0,
     last_activity_pace_sec: 0,
-    last_activity_timestamp: 0,
-
+    last_activity_timestamp: 0
   };
   var s_waitingLifetimeCallback = null;
   var s_latestSettingsSnapshot = null;
+
+  function assignObjects() {
+    var out = {};
+    for (var i = 0; i < arguments.length; i += 1) {
+      var src = arguments[i] || {};
+      for (var key in src) {
+        if (hasOwn(src, key)) {
+          out[key] = src[key];
+        }
+      }
+    }
+    return out;
+  }
 
   function loadSettings() {
     var raw = localStorage.getItem(SETTINGS_KEY);
@@ -44,7 +64,7 @@
       return defaults;
     }
     try {
-      return Object.assign({}, defaults, JSON.parse(raw));
+      return assignObjects(defaults, JSON.parse(raw));
     } catch (e) {
       return defaults;
     }
@@ -102,7 +122,7 @@
   }
 
   function normalizeSettings(settings) {
-    var out = Object.assign({}, defaults, settings || {});
+    var out = assignObjects(defaults, settings || {});
     out.profile1_terrain_type = terrainTypeFromSettings(out.profile1_terrain_type, out.profile1_terrain_factor);
     out.profile2_terrain_type = terrainTypeFromSettings(out.profile2_terrain_type, out.profile2_terrain_factor);
     out.profile3_terrain_type = terrainTypeFromSettings(out.profile3_terrain_type, out.profile3_terrain_factor);
@@ -214,7 +234,10 @@
         return;
       }
       attempts += 1;
-      Pebble.sendAppMessage({ request_lifetime_totals: 1 }, function() {
+      var msg = {};
+      msg.request_lifetime_totals = 1;
+      msg[String(KEY_REQUEST_LIFETIME_TOTALS)] = 1;
+      Pebble.sendAppMessage(msg, function() {
         // Wait for appmessage response. Retry timer handles missed responses.
       }, function() {
         if (attempts >= maxAttempts) {
@@ -243,9 +266,12 @@
     var p2TerrainType = terrainTypeFromSettings(s.profile2_terrain_type, s.profile2_terrain_factor);
     var p3TerrainType = terrainTypeFromSettings(s.profile3_terrain_type, s.profile3_terrain_factor);
     var terrainOptions = terrainOptionsHtml();
-    var weightIcon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABYUlEQVR4AeRU4VUDMQgmncARdAPdQCdwBN3AbtJVdAPdoBvoBk6g9IOQ3LWBK32v/dW8EDj44MuRvKzowuOKCJh5w9PYZDubatEfihPTmqaxBleKJEUAkBYvNoxHfWaHCrlh7CyBkAAt+OV/rJjKVIjYHGiXulhGxXyrw1lcAuS9AnsDOZhgEY8p7jbfIsdtmUuAvDdLfrK2u2oFL7APRMr4Qs6ICO4Fi/xP0UsCzFbi2JDmiD2XiKDuaY5ctDnEhwS8WDAfDAnyJSoy2tBAgNvwKCk4tqP9F1yVsi0wkDucw0AAnBJAf0Gy88OAw03yCJ4NfMIf0DvV0TZXv7B6BPqbuH5pAmD1qqKe5kL36RH04ClG+pBbUX1ipgXnN5vqn33jjZJDbm9UqyHa+4M7Caholi546cRj+zSXePakEJ6NPQ8NBOjnD6TIOyO6izp06a7J6P52Fp1lIOiRMxkXJ9gBAAD//+xKIa4AAAAGSURBVAMAmz2PMR1V/7YAAAAASUVORK5CYII=';
-    var terrainIcon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABqElEQVR4AdyU4VHDMAyFnzoBbACbwAawAWwAE1AmgA1gA9igbNJuABNEfHZsx65zvVyP/kEn2crTs56T9rTSie2fC7j7mvAhLO53h74mlDNiQ3zUvO4TQXjw1BLiEyELi/TmkxUxIC4xOJRv4kryG/bijQBkp/JCKCTsX8TorjpHbIjXgPikfAX11ghMZTtfWbTrjNnKrg3j+VKmnVjim5mC8Dml+ChwVdYLcHXIPxWnSantiMsMkgfhik+DXGTvBQCP9tg7vUhq0gu09USb22K3tjBzthdojxx4mukWNeNSzi0QcP4ohb8gaYUXCNje/2KBRkVZIFCxj0gXCLTftNaYr7ToAgGrezb5fKVFe4H2AjTsALDRu0rbO5J6gURiLsXpqPQTM3i2YBcq5qkyAtTOxqxdewGXnG7Q8nQkjR6abwfHBt+I9lDhOiMaVAp8cZqYvBeItfQa0rMx5Zg3JtN9KNm4XI1bWEUeUWGPBp+9+L7Ap0xlOtJ4rWTk70R0oHsiO5cw2sbSawbz3ghAuSX2pmOmTjucIkZeLjExpqwRmOC/y04u8AsAAP//3EypAQAAAAZJREFUAwCgdJgxQLeyzwAAAABJRU5ErkJggg==';
-    var gradeIcon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAB30lEQVR4AcyUi1XsMAxEpa2AEnY74nXw6IAOgAooATqAEuhk6QAqwNwZO04M4bN8zsHHlmRFmrGlJJv45fH3CUop2/eK8K0bAH4F+B59jPbEPrLRxJcJADoF4z9L806irYemrb5EALjKcmmEiF1mPsrGXyKY2rR1MAEgR+TuG9AF4PfsAz8+WeM6mID0VoK8BfycvcBvOPf2xeH1KN4k4ESlPJV5TLbSStwD/i8YBEBSjhM7ZqGd1yoBSXo7oiaU8HCyrchN7mQRp16cRQ3cfeoGLclvR3psLCehXTCIq72o/LUXPkR1EOK5dgOa5aATR7wtHhyV0XsRHmaxJTEQcCrA5U7V+FoWvtUZ1CMjFOdehIYZLbTz6gSgqCx+EyjHVOPaC4Uu82xnTHF67JWWg+gEeOvXmDGBq4EiDYCSxlpZqBEY5KzMkaUTEK/rotIfDpl7qoCKj3qhmMXy9fq+E3QPBuXatzCRXuM6YOYQ+4oA8FMauFUYZXG5howPN+1oLe4VAWW5bM8OBx+xDTMQ6G9gb+j8of88F5IXtZx2WZTl76SmVYRJdoJSypVh25P5MCteu5LLEmwbremkpSPmnx2vzwkrqftS2Z5Fez+bY9zhbA5xTavfYHL8tP51gmcAAAD//2tJwoIAAAAGSURBVAMAu73qMUTY1OoAAAAASUVORK5CYII=';
+    function svgIcon(body) {
+      return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">' + body + '</svg>');
+    }
+    var weightIcon = svgIcon('<path fill="#111" d="M5 5h6l1 9H4l1-9zm1-3h4v2H6V2zm1 1v1h2V3H7z"/>');
+    var terrainIcon = svgIcon('<path fill="#111" d="M1 12l3-6 3 4 2-3 6 5v2H1v-2zm8-6l2-4 4 7-4-3H9z"/>');
+    var gradeIcon = svgIcon('<path fill="#111" d="M2 12h12v2H2v-2zm1-2l8-8 2 2-8 8H3v-2z"/>');
     var html = '' +
       '<!doctype html><html><head><meta charset="utf-8">' +
       '<meta name="viewport" content="width=device-width,initial-scale=1">' +
@@ -255,8 +281,7 @@
       'h1{font-size:20px;margin:0 0 12px;}h2{font-size:16px;margin:18px 0 8px;}' +
       'label{display:block;margin:10px 0 4px;font-weight:600;}' +
       '.icon-label{display:flex;align-items:center;gap:6px;}' +
-      '.icon-label img{width:14px;height:14px;display:inline-block;filter:brightness(0) invert(1);}' +
-      '.icon-chip{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:#111;}' +
+      '.icon-label img{width:14px;height:14px;display:inline-block;}' +
       'input,select{width:100%;padding:8px;font-size:14px;box-sizing:border-box;}' +
       '.row{display:flex;gap:8px;}.row>div{flex:1;}' +
       '.card{background:#fff;border-radius:8px;padding:12px;margin-top:10px;}' +
@@ -284,23 +309,23 @@
 
       '<div class="card"><h2>Profile 1</h2>' +
       '<label>Profile name (optional)</label><input type="text" id="p1_name" maxlength="32">' +
-      '<label id="p1_ruck_weight_label" class="icon-label"><span>Ruck weight (kg)</span><span class="icon-chip"><img src="' + weightIcon + '" alt=""></span></label><input type="number" id="p1_ruck_weight_value" step="0.1">' +
-      '<label class="icon-label"><span>Terrain</span><span class="icon-chip"><img src="' + terrainIcon + '" alt=""></span></label><select id="p1_terrain_type">' + terrainOptions + '</select>' +
-      '<label class="icon-label"><span>Grade (%)</span><span class="icon-chip"><img src="' + gradeIcon + '" alt=""></span></label><input type="number" id="p1_grade_percent" step="1">' +
+      '<label id="p1_ruck_weight_label" class="icon-label"><img src="' + weightIcon + '" alt=""><span>Ruck weight (kg)</span></label><input type="number" id="p1_ruck_weight_value" step="0.1">' +
+      '<label class="icon-label"><img src="' + terrainIcon + '" alt="">Terrain</label><select id="p1_terrain_type">' + terrainOptions + '</select>' +
+      '<label class="icon-label"><img src="' + gradeIcon + '" alt="">Grade (%)</label><input type="number" id="p1_grade_percent" step="1">' +
       '</div>' +
 
       '<div class="card"><h2>Profile 2</h2>' +
       '<label>Profile name (optional)</label><input type="text" id="p2_name" maxlength="32">' +
-      '<label id="p2_ruck_weight_label" class="icon-label"><span>Ruck weight (kg)</span><span class="icon-chip"><img src="' + weightIcon + '" alt=""></span></label><input type="number" id="p2_ruck_weight_value" step="0.1">' +
-      '<label class="icon-label"><span>Terrain</span><span class="icon-chip"><img src="' + terrainIcon + '" alt=""></span></label><select id="p2_terrain_type">' + terrainOptions + '</select>' +
-      '<label class="icon-label"><span>Grade (%)</span><span class="icon-chip"><img src="' + gradeIcon + '" alt=""></span></label><input type="number" id="p2_grade_percent" step="1">' +
+      '<label id="p2_ruck_weight_label" class="icon-label"><img src="' + weightIcon + '" alt=""><span>Ruck weight (kg)</span></label><input type="number" id="p2_ruck_weight_value" step="0.1">' +
+      '<label class="icon-label"><img src="' + terrainIcon + '" alt="">Terrain</label><select id="p2_terrain_type">' + terrainOptions + '</select>' +
+      '<label class="icon-label"><img src="' + gradeIcon + '" alt="">Grade (%)</label><input type="number" id="p2_grade_percent" step="1">' +
       '</div>' +
 
       '<div class="card"><h2>Profile 3</h2>' +
       '<label>Profile name (optional)</label><input type="text" id="p3_name" maxlength="32">' +
-      '<label id="p3_ruck_weight_label" class="icon-label"><span>Ruck weight (kg)</span><span class="icon-chip"><img src="' + weightIcon + '" alt=""></span></label><input type="number" id="p3_ruck_weight_value" step="0.1">' +
-      '<label class="icon-label"><span>Terrain</span><span class="icon-chip"><img src="' + terrainIcon + '" alt=""></span></label><select id="p3_terrain_type">' + terrainOptions + '</select>' +
-      '<label class="icon-label"><span>Grade (%)</span><span class="icon-chip"><img src="' + gradeIcon + '" alt=""></span></label><input type="number" id="p3_grade_percent" step="1">' +
+      '<label id="p3_ruck_weight_label" class="icon-label"><img src="' + weightIcon + '" alt=""><span>Ruck weight (kg)</span></label><input type="number" id="p3_ruck_weight_value" step="0.1">' +
+      '<label class="icon-label"><img src="' + terrainIcon + '" alt="">Terrain</label><select id="p3_terrain_type">' + terrainOptions + '</select>' +
+      '<label class="icon-label"><img src="' + gradeIcon + '" alt="">Grade (%)</label><input type="number" id="p3_grade_percent" step="1">' +
       '</div>' +
 
       '<div class="card"><h2>Tracked Totals</h2>' +
@@ -330,10 +355,11 @@
       'return "sand";}' +
       'function updateRuckWeightLabels(){' +
       'var unit=($("ruck_weight_unit").value==="1")?"lb":"kg";' +
-      '$("p1_ruck_weight_label").querySelector("span").textContent="Ruck weight ("+unit+")";' +
-      '$("p2_ruck_weight_label").querySelector("span").textContent="Ruck weight ("+unit+")";' +
-      '$("p3_ruck_weight_label").querySelector("span").textContent="Ruck weight ("+unit+")";' +
+      '$("p1_ruck_weight_label").getElementsByTagName("span")[0].textContent="Ruck weight ("+unit+")";' +
+      '$("p2_ruck_weight_label").getElementsByTagName("span")[0].textContent="Ruck weight ("+unit+")";' +
+      '$("p3_ruck_weight_label").getElementsByTagName("span")[0].textContent="Ruck weight ("+unit+")";' +
       '}' +
+      'function copy(o){var r={};for(var k in o){if(Object.prototype.hasOwnProperty.call(o,k)){r[k]=o[k];}}return r;}' +
       'function terrainFactorFromType(t){' +
       'if(t==="road"){return 100;}' +
       'if(t==="gravel"){return 120;}' +
@@ -384,7 +410,7 @@
       'applyToForm(s);' +
       '$("ruck_weight_unit").addEventListener("change",updateRuckWeightLabels);' +
       '$("reset_defaults").addEventListener("click",function(){' +
-      's=Object.assign({},d);' +
+      's=copy(d);' +
       'applyToForm(s);' +
       '$("save").click();' +
       '});' +
@@ -507,17 +533,20 @@
       'lifetime_distance_m_total', 'lifetime_calories_total',
       'last_activity_distance_m', 'last_activity_calories',
       'last_activity_pace_sec', 'last_activity_timestamp',
-      '10020', '10022', '10023', '10024', '10025', '10026', '10027'
+      String(KEY_INSERT_TIMELINE_PIN),
+      String(KEY_LIFETIME_DISTANCE_M_TOTAL), String(KEY_LIFETIME_CALORIES_TOTAL),
+      String(KEY_LAST_ACTIVITY_DISTANCE_M), String(KEY_LAST_ACTIVITY_CALORIES),
+      String(KEY_LAST_ACTIVITY_PACE_SEC), String(KEY_LAST_ACTIVITY_TIMESTAMP)
     ])) {
       var s = loadSettings();
       var prevTimestamp = s.last_activity_timestamp || 0;
-      var insertTimelinePinRequested = readIntFromPayload(payload, 'insert_timeline_pin', 10020, 0) === 1;
-      s.lifetime_distance_m_total = readIntFromPayload(payload, 'lifetime_distance_m_total', 10022, s.lifetime_distance_m_total || 0);
-      s.lifetime_calories_total = readIntFromPayload(payload, 'lifetime_calories_total', 10023, s.lifetime_calories_total || 0);
-      s.last_activity_distance_m = readIntFromPayload(payload, 'last_activity_distance_m', 10024, s.last_activity_distance_m || 0);
-      s.last_activity_calories = readIntFromPayload(payload, 'last_activity_calories', 10025, s.last_activity_calories || 0);
-      s.last_activity_pace_sec = readIntFromPayload(payload, 'last_activity_pace_sec', 10026, s.last_activity_pace_sec || 0);
-      s.last_activity_timestamp = readIntFromPayload(payload, 'last_activity_timestamp', 10027, s.last_activity_timestamp || 0);
+      var insertTimelinePinRequested = readIntFromPayload(payload, 'insert_timeline_pin', KEY_INSERT_TIMELINE_PIN, 0) === 1;
+      s.lifetime_distance_m_total = readIntFromPayload(payload, 'lifetime_distance_m_total', KEY_LIFETIME_DISTANCE_M_TOTAL, s.lifetime_distance_m_total || 0);
+      s.lifetime_calories_total = readIntFromPayload(payload, 'lifetime_calories_total', KEY_LIFETIME_CALORIES_TOTAL, s.lifetime_calories_total || 0);
+      s.last_activity_distance_m = readIntFromPayload(payload, 'last_activity_distance_m', KEY_LAST_ACTIVITY_DISTANCE_M, s.last_activity_distance_m || 0);
+      s.last_activity_calories = readIntFromPayload(payload, 'last_activity_calories', KEY_LAST_ACTIVITY_CALORIES, s.last_activity_calories || 0);
+      s.last_activity_pace_sec = readIntFromPayload(payload, 'last_activity_pace_sec', KEY_LAST_ACTIVITY_PACE_SEC, s.last_activity_pace_sec || 0);
+      s.last_activity_timestamp = readIntFromPayload(payload, 'last_activity_timestamp', KEY_LAST_ACTIVITY_TIMESTAMP, s.last_activity_timestamp || 0);
       var isNewSave = s.last_activity_timestamp > prevTimestamp && s.last_activity_timestamp > 0;
       var shouldInsertTimelinePin = (insertTimelinePinRequested || isNewSave) && s.last_activity_timestamp > 0;
       s = normalizeSettings(s);
@@ -563,7 +592,7 @@
     // Never allow config form submit to clobber live totals/last-activity snapshots.
     var current = normalizeSettings(loadSettings());
     var incoming = normalizeSettings(settings);
-    var merged = Object.assign({}, incoming);
+    var merged = assignObjects(incoming);
     merged.lifetime_distance_m_total = Math.max(current.lifetime_distance_m_total, incoming.lifetime_distance_m_total);
     merged.lifetime_calories_total = Math.max(current.lifetime_calories_total, incoming.lifetime_calories_total);
     if (incoming.last_activity_timestamp >= current.last_activity_timestamp) {
