@@ -12,7 +12,7 @@ SCREEN_LAYOUTS = {
         "sections": {
             "Profiles": {"anchor": (34, 86), "box": (50, 175, 405), "side": "left"},
         },
-        "footer_box": (370, 345, 760, 427),
+        "footer_box": (1030, 20, 1490, 190),
     },
     "tracking": {
         "canvas_size": (1500, 920),
@@ -27,7 +27,7 @@ SCREEN_LAYOUTS = {
             "Heart Rate": {"anchor": (102, 104), "box": (1045, 620, 405), "side": "right"},
             "Calories": {"anchor": (152, 188), "box": (1045, 760, 405), "side": "right"},
         },
-        "footer_box": (300, 440, 920, 522),
+        "footer_box": (910, 20, 1490, 190),
     },
     "settings": {
         "canvas_size": (1800, 1500),
@@ -40,7 +40,7 @@ SCREEN_LAYOUTS = {
             "Tracked Totals": {"anchor": (32, 864), "box": (1290, 680, 460), "side": "right"},
             "Last Activity": {"anchor": (32, 1000), "box": (1290, 890, 460), "side": "right"},
         },
-        "footer_box": (470, 1350, 860, 1428),
+        "footer_box": (1270, 20, 1770, 170),
     },
 }
 
@@ -154,7 +154,7 @@ def draw_anchor(draw, point, accent="#e45545"):
     draw.ellipse((x - r, y - r, x + r, y + r), fill=accent, outline="white", width=2)
 
 
-def place_watch(canvas, screenshot, scale=0.72, top=150):
+def place_watch(canvas, screenshot, scale=1.0, top=150):
     watch = Image.open(screenshot).convert("RGB")
     watch = watch.resize((int(watch.width * scale), int(watch.height * scale)), Image.Resampling.NEAREST)
     wx = (canvas.width - watch.width) // 2
@@ -299,15 +299,15 @@ def render_screen(doc, screenshot_path, output_path):
     bx, by, bw, bh = footer_box
     footer_subtitle = footer.get("subtitle", "")
     footer_lines = wrap_text(draw, footer_subtitle, f_footer, bw - 60) if footer_subtitle else []
-    footer_height = 56 + max(1, len(footer_lines)) * 24
-    footer_box = (bx, by, bw, max(bh, by + footer_height))
+    footer_height = 14 + 24 + max(1, len(footer_lines)) * 20
+    footer_box = (bx, by, bw, min(bh, by + footer_height))
     draw.rounded_rectangle(footer_box, radius=12, fill="#e6f0ff", outline="#8ab2e6", width=2)
-    draw.text((bx + 30, by + 12), footer.get("title", ""), fill="#1f4f84", font=f_box_title)
+    draw.text((bx + 24, by + 10), footer.get("title", ""), fill="#1f4f84", font=f_box_title)
     if footer_lines:
-        yy = by + 44
+        yy = by + 38
         for line in footer_lines:
-            draw.text((bx + 30, yy), line, fill="#1f4f84", font=f_footer)
-            yy += 22
+            draw.text((bx + 24, yy), line, fill="#1f4f84", font=f_footer)
+            yy += 20
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(output_path)

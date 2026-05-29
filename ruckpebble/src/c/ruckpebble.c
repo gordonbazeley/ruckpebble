@@ -587,7 +587,7 @@ static void prv_update_display(void) {
       }
     }
   }
-  if (current_pace_sec <= 0) {
+  if (current_pace_sec <= 0 && !s_health_available) {
     current_pace_sec = session_pace_display_sec;
   }
   s_current_pace_sec = (int32_t)current_pace_sec;

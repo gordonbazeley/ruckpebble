@@ -30,7 +30,7 @@
 - description: Overall pace for the session per kilometre or mile.
 
 ## Current Pace
-- description: Current pace per kilometre or mile.
+- description: Pace per kilometre or mile over last minute.
 
 ## Steps
 - description: The first line shows steps for the current ruck session. The second line shows total steps for today.
