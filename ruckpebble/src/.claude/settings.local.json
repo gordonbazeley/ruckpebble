@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x *)",
+      "Bash(pebble build *)",
+      "Bash(pebble kill *)",
+      "Bash(pebble install *)",
+      "Read(//Users/gordonbazeley/Library/Application Support/Pebble SDK/4.9.169/emery/**)",
+      "Read(//Users/gordonbazeley/**)",
+      "Read(//Users/gordonbazeley/.config/**)",
+      "Read(//private/tmp/**)",
+      "Bash(python3 *)",
+      "Bash(pebble ping *)",
+      "Bash(cp /Users/gordonbazeley/src/ruckpebble/ruckpebble/build/ruckpebble.pbw /tmp/ruckpebble.pbw)",
+      "Bash(unzip -l /tmp/ruckpebble.pbw)",
+      "Bash(tmux capture-pane *)",
+      "Bash(TMPDIR=\"\" python3 *)",
+      "Bash(pebble wipe *)",
+      "Bash(PYTHONPATH=/Users/gordonbazeley/.local/share/uv/tools/pebble-tool/lib/python3.13/site-packages python3 *)",
+      "Bash(awk '{print $2, $9, $11, $12, $13}')",
+      "Bash(/opt/homebrew/Cellar/python@3.13/3.13.13_1/Frameworks/Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python --version)",
+      "Bash(/opt/homebrew/opt/python@3.13/bin/python3.13 *)",
+      "Bash(/Users/gordonbazeley/.local/share/uv/tools/pebble-tool/bin/python3 *)",
+      "Bash(pebble repl *)",
+      "Bash(kill %1)",
+      "Bash(awk '{print $2, $9, substr\\($0, index\\($0,$11\\), 60\\)}')",
+      "Bash(awk '{print $2, $8, $9}')",
+      "Bash(pkill -f \"qemu-pebble\")",
+      "Bash(pkill -f \"pypkjs\")",
+      "Bash(awk '{print $2, $9, substr\\($0, index\\($0,$11\\), 50\\)}')",
+      "Bash(kill 8934)",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs kill)",
+      "Bash(awk '{print $2, $9}')",
+      "Bash(Read /private/tmp/claude-501/-Users-gordonbazeley-src-ruckpebble-ruckpebble-src/a95775e5-35e7-4dba-8ca6-cd51768404b9/tasks/bevywmd3z.output)",
+      "Bash(awk '{print $2, $9, $8}')",
+      "Bash(pkill -f \"pebble install\")",
+      "Bash(arm-none-eabi-addr2line *)",
+      "Bash(/Users/gordonbazeley/Library/Application Support/Pebble SDK/SDKs/4.9.148/toolchain/arm-none-eabi/bin/arm-none-eabi-addr2line *)"
+    ]
+  }
+}
