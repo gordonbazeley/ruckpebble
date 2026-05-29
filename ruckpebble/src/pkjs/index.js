@@ -34,8 +34,6 @@
     last_activity_pace_sec: 0,
     last_activity_timestamp: 0,
 
-    sim_steps_enabled: 1,
-    sim_steps_spm: 122
   };
   var s_waitingLifetimeCallback = null;
   var s_latestSettingsSnapshot = null;
@@ -124,10 +122,34 @@
     var normalized = normalizeSettings(settings);
     s_latestSettingsSnapshot = normalized;
     saveSettings(normalized);
-    Pebble.sendAppMessage(normalized, function() {
-      console.log('initial/send settings success');
+    // Strip read-only stats — the watch owns those values and never reads them
+    // from phone→watch messages.
+    var watchMsg = {
+      weight_value:              normalized.weight_value,
+      weight_unit:               normalized.weight_unit,
+      ruck_weight_unit:          normalized.ruck_weight_unit,
+      stride_length_value:       normalized.stride_length_value,
+      stride_length_unit:        normalized.stride_length_unit,
+      profile1_ruck_weight_value: normalized.profile1_ruck_weight_value,
+      profile1_terrain_factor:   normalized.profile1_terrain_factor,
+      profile1_terrain_type:     normalized.profile1_terrain_type,
+      profile1_grade_percent:    normalized.profile1_grade_percent,
+      profile1_name:             normalized.profile1_name,
+      profile2_ruck_weight_value: normalized.profile2_ruck_weight_value,
+      profile2_terrain_factor:   normalized.profile2_terrain_factor,
+      profile2_terrain_type:     normalized.profile2_terrain_type,
+      profile2_grade_percent:    normalized.profile2_grade_percent,
+      profile2_name:             normalized.profile2_name,
+      profile3_ruck_weight_value: normalized.profile3_ruck_weight_value,
+      profile3_terrain_factor:   normalized.profile3_terrain_factor,
+      profile3_terrain_type:     normalized.profile3_terrain_type,
+      profile3_grade_percent:    normalized.profile3_grade_percent,
+      profile3_name:             normalized.profile3_name,
+    };
+    Pebble.sendAppMessage(watchMsg, function() {
+      console.log('send settings success');
     }, function(err) {
-      console.log('initial/send settings failed:', JSON.stringify(err));
+      console.log('send settings failed:', JSON.stringify(err));
     });
   }
 
@@ -293,6 +315,7 @@
       '<div class="stat-row"><span class="stat-label">Calories</span><span class="stat-value" id="last_activity_calories_display">--</span></div>' +
       '</div>' +
 
+
       '<div class="actions">' +
       '<button id="save" type="button">Save</button>' +
       '<button id="reset_defaults" type="button">Reset</button>' +
@@ -390,9 +413,7 @@
       'profile3_terrain_type: $("p3_terrain_type").value,' +
       'profile3_terrain_factor: terrainFactorFromType($("p3_terrain_type").value),' +
       'profile3_grade_percent: (parseInt($("p3_grade_percent").value,10)||0)*10,' +
-      'profile3_name: ($("p3_name").value||"").trim().slice(0,32),' +
-      'sim_steps_enabled: (s.sim_steps_enabled?1:0),' +
-      'sim_steps_spm: (s.sim_steps_spm||122)' +
+      'profile3_name: ($("p3_name").value||"").trim().slice(0,32)' +
       '};' +
       'var payload=encodeURIComponent(JSON.stringify(out));' +
       'var ret=queryParam("return_to");' +
@@ -407,9 +428,7 @@
 
   Pebble.addEventListener('showConfiguration', function() {
     console.log('showConfiguration event');
-    requestLifetimeTotals(function() {
-      openConfig(s_latestSettingsSnapshot);
-    });
+    openConfig(s_latestSettingsSnapshot);
   });
 
   Pebble.addEventListener('ready', function() {

@@ -1,7 +1,7 @@
 {
   "name": "RuckPebble",
   "author": "ModusApps",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "keywords": ["pebble-app"],
   "private": true,
   "dependencies": {},
@@ -14,7 +14,8 @@
       "emery"
     ],
     "watchapp": {
-      "watchface": false
+      "watchface": false,
+      "configurable": true
     },
     "messageKeys": [
       "weight_value",

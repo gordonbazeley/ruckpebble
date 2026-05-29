@@ -8,7 +8,21 @@
       "Bash(pkill:*)",
       "Read(//Users/gordonbazeley/src/ruckpebble/ruckpebble/$TMPDIR/**)",
       "Read(//tmp/**)",
-      "Bash(bash *)"
+      "Bash(bash *)",
+      "Bash(tmux -V)",
+      "Bash(tmux list-keys *)",
+      "Bash(tmux show-options *)",
+      "Read(//Users/gordonbazeley/src/gjb/tmux/**)",
+      "Read(//Users/gordonbazeley/.config/tmux/**)",
+      "Bash(kill %1)",
+      "Bash(wait)",
+      "Bash(xargs ls -la)",
+      "Bash(xargs cat)",
+      "Bash(unset PYTHONPATH)",
+      "Bash(unset PYTHONHOME)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -W all -c ' *)"
     ]
   }
 }

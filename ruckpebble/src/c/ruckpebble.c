@@ -52,7 +52,7 @@ static const Settings SETTINGS_DEFAULTS = {
   .ruck_weight_unit = 1,
   .stride_value = 780,
   .stride_unit = 0,
-  .sim_steps_enabled = 1,
+  .sim_steps_enabled = 0,
   .sim_steps_spm = 122,
   .active_profile = 0,
   .profiles = {
@@ -350,6 +350,7 @@ static void prv_load_settings(void) {
   if (persist_exists(SETTINGS_PERSIST_KEY)) {
     persist_read_data(SETTINGS_PERSIST_KEY, &s_settings, sizeof(s_settings));
   }
+  s_settings.sim_steps_enabled = 0;
   for (int i = 0; i < PROFILE_COUNT; ++i) {
     s_settings.profiles[i].terrain_factor = prv_normalize_terrain_factor(s_settings.profiles[i].terrain_factor);
     if (s_settings.profile_terrain_types[i][0] == '\0') {
@@ -459,19 +460,14 @@ static void prv_update_display(void) {
   int32_t steps = 0;
   int32_t steps_total_day = 0;
   if (s_health_available) {
-    steps_total_day = (int32_t)health_service_sum(HealthMetricStepCount, s_day_start, now);
+    // peek_current_value updates more frequently than health_service_sum (which batches ~1min)
+    HealthValue peeked = health_service_peek_current_value(HealthMetricStepCount);
+    steps_total_day = (peeked > 0) ? (int32_t)peeked : 0;
     if (steps_total_day < 0) {
       steps_total_day = 0;
     }
   }
-  if (s_settings.sim_steps_enabled) {
-    steps = (int32_t)((elapsed_s * (int64_t)s_settings.sim_steps_spm) / 60);
-    if (s_health_available) {
-      steps_total_day = s_steps_baseline + steps;
-    } else {
-      steps_total_day = steps;
-    }
-  } else if (s_health_available) {
+  if (s_health_available) {
     steps = steps_total_day - s_steps_baseline;
     if (steps < 0) {
       steps = 0;
@@ -557,6 +553,8 @@ static void prv_update_display(void) {
   }
   snprintf(distance_buf, sizeof(distance_buf), "%lld.%02lld%s",
            (long long)(distance_x100 / 100), (long long)llabs(distance_x100 % 100), distance_unit_label);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "sim=%ld elapsed_real=%ld elapsed_s=%ld",
+          (long)s_settings.sim_steps_enabled, (long)elapsed_real_s, (long)elapsed_s);
   snprintf(timer_value_buf, sizeof(timer_value_buf), "%ld:%02ld",
            (long)(elapsed_s / 60), (long)(elapsed_s % 60));
   snprintf(steps_value_buf, sizeof(steps_value_buf), "%ld", (long)steps);
@@ -701,6 +699,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   t = dict_find(iter, MESSAGE_KEY_sim_steps_enabled);
   if (t) {
     s_settings.sim_steps_enabled = t->value->int32;
+    APP_LOG(APP_LOG_LEVEL_INFO, "sim_steps_enabled set to %ld", (long)s_settings.sim_steps_enabled);
   }
   t = dict_find(iter, MESSAGE_KEY_sim_steps_spm);
   if (t) {
@@ -744,7 +743,8 @@ static void prv_start_session(void) {
   s_session_calories = 0;
   s_session_totals_committed = false;
   if (s_health_available) {
-    s_steps_baseline = (int32_t)health_service_sum(HealthMetricStepCount, s_day_start, s_start_time);
+    HealthValue peeked = health_service_peek_current_value(HealthMetricStepCount);
+    s_steps_baseline = (peeked > 0) ? (int32_t)peeked : 0;
   } else {
     s_steps_baseline = 0;
   }
