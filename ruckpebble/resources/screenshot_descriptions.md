@@ -1,16 +1,18 @@
 # Profile Screen
 ## Header
 - title: Profile Selection
-- subtitle: You'll use more calories depending on the weight of your ruck, the terrain you're moving across and the gradient of your ruck.
+- subtitle: You'll use more calories depending on the weight of your ruck,
+            the terrain you're moving across and the gradient of your ruck.
             Select a profile which matches today's ruck.
 
 ## Profiles
-- description: You can define up to three profiles which define ruck weight, terrain and gradient. They'll impact the number of calories burnt when rucking
-  Select one of them here.
+- description: You can define up to three profiles which define ruck weight, terrain and gradient.
+            They'll impact the number of calories burnt when rucking.
+            Select one of them here.
 
 ## Footer
 - title: How to use
-- subtitle: Up and Down - Move between profiles       
+- subtitle: Up and Down - Move between profiles
             Select - Start ruck with the highlighted profile
             Back - Exit to Pebble menu
 
@@ -24,11 +26,11 @@
 ## Active Profile
 - description: Name of the profile selected on the profile screen.
 
-## Current Pace
-- description: Live pace per kilometre or mile.
+## Session Pace
+- description: Overall pace for the session per kilometre or mile.
 
-## Pace
-- description: Large pace readout for the current session, repeated for scanability while moving.
+## Current Pace
+- description: Current pace per kilometre or mile.
 
 ## Steps
 - description: The first line shows steps for the current ruck session. The second line shows total steps for today.
@@ -51,7 +53,7 @@
 ## Footer
 - title: How to use
 - subtitle: Up: Music
-            Down: Saves the current ruck session creates a timeline pin.
+            Down: Saves the current ruck session and creates a timeline pin.
             Back: Gives a choice between resuming current session and discarding it.
 
 ---
@@ -81,5 +83,5 @@
 
 ## Footer
 - title: How to use
-- subtitle: Save - Write the settings back to the watch 
+- subtitle: Save - Write the settings back to the watch
             Reset - Restores the default settings

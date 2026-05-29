@@ -8,32 +8,31 @@ from PIL import Image, ImageDraw, ImageFont
 
 SCREEN_LAYOUTS = {
     "profile": {
-        "canvas_size": (1500, 1000),
+        "canvas_size": (1500, 920),
         "sections": {
             "Profiles": {"anchor": (34, 86), "box": (50, 175, 405), "side": "left"},
         },
-        "footer_box": (270, 884, 1230, 964),
+        "footer_box": (370, 345, 760, 427),
     },
     "tracking": {
-        "canvas_size": (1500, 1000),
+        "canvas_size": (1500, 920),
         "sections": {
             "Active Profile": {"anchor": (34, 18), "box": (50, 175, 405), "side": "left"},
-            "Current Pace": {"anchor": (42, 56), "box": (50, 338, 405), "side": "left"},
-            "Pace": {"anchor": (60, 100), "box": (50, 500, 405), "side": "left"},
+            "Session Pace": {"anchor": (42, 56), "box": (50, 338, 430), "side": "left"},
+            "Current Pace": {"anchor": (60, 100), "box": (50, 500, 430), "side": "left"},
             "Steps": {"anchor": (58, 188), "box": (50, 675, 405), "side": "left"},
             "Watch Time": {"anchor": (172, 20), "box": (1045, 175, 405), "side": "right"},
             "Distance": {"anchor": (164, 56), "box": (1045, 338, 405), "side": "right"},
-            "Heart Rate": {"anchor": (102, 104), "box": (1045, 500, 405), "side": "right"},
-            "Elapsed Time": {"anchor": (154, 104), "box": (1045, 620, 405), "side": "right"},
+            "Elapsed Time": {"anchor": (154, 104), "box": (1045, 500, 405), "side": "right"},
+            "Heart Rate": {"anchor": (102, 104), "box": (1045, 620, 405), "side": "right"},
             "Calories": {"anchor": (152, 188), "box": (1045, 760, 405), "side": "right"},
         },
-        "footer_box": (270, 884, 1230, 964),
+        "footer_box": (300, 440, 920, 522),
     },
     "settings": {
-        "canvas_size": (1800, 1600),
-        "mock_box": (620, 130, 560, 1260),
+        "canvas_size": (1800, 1500),
+        "mock_box": (620, 70, 560, 1260),
         "sections": {
-            "Header": {"anchor": (28, 34), "box": (50, 40, 460), "side": "left"},
             "Shared": {"anchor": (32, 110), "box": (50, 250, 460), "side": "left"},
             "Profile 1": {"anchor": (32, 270), "box": (50, 445, 460), "side": "left"},
             "Profile 2": {"anchor": (32, 468), "box": (1290, 350, 460), "side": "right"},
@@ -41,7 +40,7 @@ SCREEN_LAYOUTS = {
             "Tracked Totals": {"anchor": (32, 864), "box": (1290, 680, 460), "side": "right"},
             "Last Activity": {"anchor": (32, 1000), "box": (1290, 890, 460), "side": "right"},
         },
-        "footer_box": (360, 1485, 1440, 1581),
+        "footer_box": (470, 1350, 860, 1428),
     },
 }
 
@@ -104,37 +103,43 @@ def parse_document(text):
             current_key = key
             continue
         if current_section and current_key:
-            doc["sections"][current_section][current_key] += " " + line
+            doc["sections"][current_section][current_key] += "\n" + line
     return doc
 
 
 def wrap_text(draw, text, font, width):
-    words = text.split()
     lines = []
-    current = ""
-    for word in words:
-        candidate = f"{current} {word}".strip()
-        if draw.textlength(candidate, font=font) <= width:
-            current = candidate
-        else:
-            if current:
-                lines.append(current)
-            current = word
-    if current:
-        lines.append(current)
+    if not text:
+        return lines
+    for paragraph in text.splitlines():
+        if not paragraph.strip():
+            lines.append("")
+            continue
+        words = paragraph.split()
+        current = ""
+        for word in words:
+            candidate = f"{current} {word}".strip()
+            if draw.textlength(candidate, font=font) <= width:
+                current = candidate
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
     return lines
 
 
-def render_callout(draw, title_font, body_font, box, title, body):
+def render_callout(draw, title_font, body_font, box, title, body, fill="#ffffff", outline="#d7dbe0", title_color="#111111", body_color="#444444"):
     bx, by, bw = box
     padding = 16
     lines = wrap_text(draw, body, body_font, bw - padding * 2)
     height = padding * 2 + 30 + len(lines) * 24
-    draw.rounded_rectangle((bx, by, bx + bw, by + height), radius=10, fill="#ffffff", outline="#d7dbe0", width=2)
-    draw.text((bx + padding, by + 12), title, fill="#111111", font=title_font)
+    draw.rounded_rectangle((bx, by, bx + bw, by + height), radius=10, fill=fill, outline=outline, width=2)
+    draw.text((bx + padding, by + 12), title, fill=title_color, font=title_font)
     yy = by + 48
     for line in lines:
-        draw.text((bx + padding, yy), line, fill="#444444", font=body_font)
+        draw.text((bx + padding, yy), line, fill=body_color, font=body_font)
         yy += 24
     return height
 
@@ -149,7 +154,7 @@ def draw_anchor(draw, point, accent="#e45545"):
     draw.ellipse((x - r, y - r, x + r, y + r), fill=accent, outline="white", width=2)
 
 
-def place_watch(canvas, screenshot, scale=2.4, top=185):
+def place_watch(canvas, screenshot, scale=0.72, top=150):
     watch = Image.open(screenshot).convert("RGB")
     watch = watch.resize((int(watch.width * scale), int(watch.height * scale)), Image.Resampling.NEAREST)
     wx = (canvas.width - watch.width) // 2
@@ -179,7 +184,7 @@ def draw_mock_card(draw, box, title, lines, fill="#ffffff", outline="#d7dbe0"):
 
 def place_settings_mock(canvas, layout):
     x, y, w, h = layout["mock_box"]
-    page = Image.new("RGB", (w, h), "#f5f5f5")
+    page = Image.new("RGB", (w, h), "#eaf3ff")
     draw = ImageDraw.Draw(page)
     title_font = load_font(30, True)
     subtitle_font = load_font(18)
@@ -247,7 +252,7 @@ def render_screen(doc, screenshot_path, output_path):
     f_subtitle = load_font(20)
     f_box_title = load_font(25, True)
     f_box_body = load_font(20)
-    f_footer = load_font(17)
+    f_footer = load_font(15)
 
     header = doc["sections"].get("Header", {})
     draw.text((56, 40), header.get("title", doc["title"]), fill="#111111", font=f_title)
@@ -263,14 +268,16 @@ def render_screen(doc, screenshot_path, output_path):
         wx, wy, watch_w, watch_h = place_settings_mock(canvas, layout)
 
         def to_canvas_point(point):
-            return (wx + int(point[0]), wy + int(point[1]))
+            return (wx + int(point[0]) - 20, wy + int(point[1]))
     else:
         wx, wy, watch_w, watch_h = place_watch(canvas, screenshot_path)
 
         def to_canvas_point(point):
-            return (wx + int(point[0] * 2.4), wy + int(point[1] * 2.4))
+            return (wx + int(point[0]), wy + int(point[1]))
 
     for section_name, section_layout in layout["sections"].items():
+        if screen_key == "settings" and section_name == "Header":
+            continue
         section = doc["sections"].get(section_name, {})
         body = section.get("description", "")
         if not body and section_name == "Header":
@@ -294,12 +301,12 @@ def render_screen(doc, screenshot_path, output_path):
     footer_lines = wrap_text(draw, footer_subtitle, f_footer, bw - 60) if footer_subtitle else []
     footer_height = 56 + max(1, len(footer_lines)) * 24
     footer_box = (bx, by, bw, max(bh, by + footer_height))
-    draw.rounded_rectangle(footer_box, radius=12, fill="#fff7f7", outline="#f0b0b0", width=2)
-    draw.text((bx + 30, by + 12), footer.get("title", ""), fill="#7a2424", font=f_box_title)
+    draw.rounded_rectangle(footer_box, radius=12, fill="#e6f0ff", outline="#8ab2e6", width=2)
+    draw.text((bx + 30, by + 12), footer.get("title", ""), fill="#1f4f84", font=f_box_title)
     if footer_lines:
         yy = by + 44
         for line in footer_lines:
-            draw.text((bx + 30, yy), line, fill="#7a2424", font=f_footer)
+            draw.text((bx + 30, yy), line, fill="#1f4f84", font=f_footer)
             yy += 22
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -325,7 +332,7 @@ def main():
     parser.add_argument("--profile-screenshot", default="/tmp/ruck_profile.png")
     parser.add_argument("--tracking-screenshot", default="/tmp/ruck_tracking_raw.png")
     parser.add_argument("--settings-screenshot", default=None)
-    parser.add_argument("--output-dir", default=str(Path(__file__).parent))
+    parser.add_argument("--output-dir", default=str(Path(__file__).with_name("explainer_screenshots")))
     args = parser.parse_args()
 
     docs = parse_documents(Path(args.spec))
