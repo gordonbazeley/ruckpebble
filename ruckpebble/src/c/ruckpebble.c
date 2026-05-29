@@ -82,7 +82,7 @@ static MenuLayer *s_profile_menu_layer;
 static Window *s_music_window;
 static MenuLayer *s_music_menu_layer;
 static Window *s_status_window;
-static TextLayer *s_status_text_layer;
+static Layer *s_status_layer;
 static AppTimer *s_status_timer;
 static Window *s_ruck_prompt_window;
 static Layer *s_ruck_prompt_layer;
@@ -427,8 +427,8 @@ static void prv_show_status_message(const char *text, uint32_t duration_ms) {
   strncpy(s_status_text, text, sizeof(s_status_text) - 1);
   s_status_text[sizeof(s_status_text) - 1] = '\0';
 
-  if (s_status_text_layer) {
-    text_layer_set_text(s_status_text_layer, s_status_text);
+  if (s_status_layer) {
+    layer_mark_dirty(s_status_layer);
   }
 
   if (!window_stack_contains_window(s_status_window)) {
@@ -1256,22 +1256,60 @@ static void prv_status_timer_callback(void *context) {
   }
 }
 
+static void prv_status_layer_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  int16_t w = bounds.size.w;
+  int16_t h = bounds.size.h;
+
+  // Black background
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+
+  // --- Floppy disk icon (white, 36x36, horizontally centred) ---
+  const int16_t icon_w = 36, icon_h = 36;
+  const int16_t icon_x = (w - icon_w) / 2;
+  const int16_t content_h = icon_h + 6 + 60; // icon + gap + text (~2 lines at 24+spacing)
+  const int16_t start_y = (h - content_h) / 2;
+  const int16_t iy = start_y;
+
+  // Body
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, GRect(icon_x, iy, icon_w, icon_h), 2, GCornersAll);
+
+  // Label cutout (top-left, with folded corner)
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, GRect(icon_x + 2, iy + 2, 18, 12), 0, GCornerNone);
+  // Fold triangle: restore corner pixel (approximate the diagonal fold)
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, GRect(icon_x + 16, iy + 2, 4, 4), 0, GCornerNone);
+
+  // Metal shutter (centred, lower portion of disk body)
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, GRect(icon_x + 9, iy + 19, 18, 13), 2, GCornersAll);
+  // Shutter slot highlight
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, GRect(icon_x + 12, iy + 22, 12, 6), 1, GCornersAll);
+
+  // --- Status text, centred below icon ---
+  GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
+  GRect text_rect = GRect(4, start_y + icon_h + 6, w - 8, 60);
+  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_draw_text(ctx, s_status_text, font, text_rect,
+                     GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
+}
+
 static void prv_status_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
-  s_status_text_layer = text_layer_create(bounds);
-  text_layer_set_text(s_status_text_layer, s_status_text);
-  text_layer_set_text_alignment(s_status_text_layer, GTextAlignmentCenter);
-  text_layer_set_font(s_status_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
-  text_layer_set_background_color(s_status_text_layer, GColorBlack);
-  text_layer_set_text_color(s_status_text_layer, GColorWhite);
-  layer_add_child(window_layer, text_layer_get_layer(s_status_text_layer));
+  s_status_layer = layer_create(bounds);
+  layer_set_update_proc(s_status_layer, prv_status_layer_update_proc);
+  layer_add_child(window_layer, s_status_layer);
 }
 
 static void prv_status_window_unload(Window *window) {
   (void)window;
-  text_layer_destroy(s_status_text_layer);
-  s_status_text_layer = NULL;
+  layer_destroy(s_status_layer);
+  s_status_layer = NULL;
 }
 
 static void prv_main_up_click_handler(ClickRecognizerRef recognizer, void *context) {

@@ -30,15 +30,15 @@ SCREEN_LAYOUTS = {
         "footer_box": (910, 20, 1490, 190),
     },
     "settings": {
-        "canvas_size": (1800, 1500),
-        "mock_box": (620, 70, 560, 1260),
+        "canvas_size": (1800, 1700),
+        "mock_box": (660, 70, 460, 1466),
         "sections": {
-            "Shared": {"anchor": (32, 110), "box": (50, 250, 460), "side": "left"},
-            "Profile 1": {"anchor": (32, 270), "box": (50, 445, 460), "side": "left"},
-            "Profile 2": {"anchor": (32, 468), "box": (1290, 350, 460), "side": "right"},
-            "Profile 3": {"anchor": (32, 666), "box": (50, 670, 460), "side": "left"},
-            "Tracked Totals": {"anchor": (32, 864), "box": (1290, 680, 460), "side": "right"},
-            "Last Activity": {"anchor": (32, 1000), "box": (1290, 890, 460), "side": "right"},
+            "Shared":        {"anchor": (16,   65), "box": (50,  130, 460), "side": "left"},
+            "Profile 1":     {"anchor": (16,  232), "box": (50,  240, 460), "side": "left"},
+            "Profile 2":     {"anchor": (16,  438), "box": (1290, 220, 460), "side": "right"},
+            "Profile 3":     {"anchor": (16,  886), "box": (50,  680, 460), "side": "left"},
+            "Tracked Totals":{"anchor": (16, 1085), "box": (1290, 730, 460), "side": "right"},
+            "Last Activity": {"anchor": (16, 1178), "box": (1290, 940, 460), "side": "right"},
         },
         "footer_box": (1270, 20, 1770, 170),
     },
@@ -78,6 +78,7 @@ def parse_document(text):
     doc = {"title": "", "sections": {}}
     current_section = None
     current_key = None
+    value_start_col = 0
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line:
@@ -101,9 +102,16 @@ def parse_document(text):
             value = m.group(2).strip()
             doc["sections"][current_section][key] = value
             current_key = key
+            # Track where the value starts so continuation lines can preserve
+            # relative indentation (used to distinguish bullet nesting levels).
+            colon_idx = raw_line.index(":")
+            value_start_col = colon_idx + 2
             continue
         if current_section and current_key:
-            doc["sections"][current_section][current_key] += "\n" + line
+            raw_indent = len(raw_line) - len(raw_line.lstrip())
+            relative_indent = max(0, raw_indent - value_start_col)
+            normalized = " " * relative_indent + line
+            doc["sections"][current_section][current_key] += "\n" + normalized
     return doc
 
 
@@ -130,16 +138,77 @@ def wrap_text(draw, text, font, width):
     return lines
 
 
+BULLET = "•"
+
+
+def layout_lines(draw, text, font, width):
+    """Returns list of (display_text, x_offset_px) for rendering.
+
+    Lines starting with '* ' become level-1 bullets; lines starting with
+    two or more spaces then '* ' become level-2 bullets (indented further).
+    """
+    result = []
+    if not text:
+        return result
+
+    for raw_para in text.splitlines():
+        if not raw_para.strip():
+            result.append(("", 0))
+            continue
+
+        stripped = raw_para.lstrip()
+        leading = len(raw_para) - len(stripped)
+
+        m_bullet = re.match(r"^\* (.+)$", stripped)
+        if m_bullet:
+            bullet_text = m_bullet.group(1)
+            indent_px = 20 if leading >= 2 else 0
+            prefix = f"{BULLET} "
+            prefix_w = int(draw.textlength(prefix, font=font))
+            cont_x = indent_px + prefix_w
+
+            words = bullet_text.split()
+            current = ""
+            first = True
+            for word in words:
+                candidate = f"{current} {word}".strip()
+                avail = width - (indent_px if first else cont_x)
+                if draw.textlength(candidate, font=font) <= avail:
+                    current = candidate
+                else:
+                    if current:
+                        result.append((prefix + current if first else current, indent_px if first else cont_x))
+                        first = False
+                    current = word
+            if current:
+                result.append((prefix + current if first else current, indent_px if first else cont_x))
+        else:
+            words = stripped.split()
+            current = ""
+            for word in words:
+                candidate = f"{current} {word}".strip()
+                if draw.textlength(candidate, font=font) <= width:
+                    current = candidate
+                else:
+                    if current:
+                        result.append((current, 0))
+                    current = word
+            if current:
+                result.append((current, 0))
+
+    return result
+
+
 def render_callout(draw, title_font, body_font, box, title, body, fill="#ffffff", outline="#d7dbe0", title_color="#111111", body_color="#444444"):
     bx, by, bw = box
     padding = 16
-    lines = wrap_text(draw, body, body_font, bw - padding * 2)
+    lines = layout_lines(draw, body, body_font, bw - padding * 2)
     height = padding * 2 + 30 + len(lines) * 24
     draw.rounded_rectangle((bx, by, bx + bw, by + height), radius=10, fill=fill, outline=outline, width=2)
     draw.text((bx + padding, by + 12), title, fill=title_color, font=title_font)
     yy = by + 48
-    for line in lines:
-        draw.text((bx + padding, yy), line, fill=body_color, font=body_font)
+    for line_text, x_off in lines:
+        draw.text((bx + padding + x_off, yy), line_text, fill=body_color, font=body_font)
         yy += 24
     return height
 
@@ -199,19 +268,19 @@ def place_settings_mock(canvas, layout):
     draw_mock_card(draw, (16, 252, 528, 180), "Profile 1", [
         ("Profile name", "30lb, road"),
         ("Ruck weight", "30.0"),
-        ("Terrain", "Road"),
+        ("Terrain", "Road (1.0)"),
         ("Grade (%)", "0"),
     ])
     draw_mock_card(draw, (16, 448, 528, 180), "Profile 2", [
-        ("Profile name", "15lb, trail, hilly"),
-        ("Ruck weight", "15.0"),
-        ("Terrain", "Gravel"),
-        ("Grade (%)", "10"),
+        ("Profile name", "30lb, hilly"),
+        ("Ruck weight", "30.0"),
+        ("Terrain", "Road (1.0)"),
+        ("Grade (%)", "0"),
     ])
     draw_mock_card(draw, (16, 644, 528, 180), "Profile 3", [
-        ("Profile name", ""),
-        ("Ruck weight", "30.0"),
-        ("Terrain", "Mixed"),
+        ("Profile name", "15lb, road"),
+        ("Ruck weight", "15.0"),
+        ("Terrain", "Road (1.0)"),
         ("Grade (%)", "0"),
     ])
     draw_mock_card(draw, (16, 840, 528, 132), "Tracked Totals", [
@@ -233,6 +302,16 @@ def place_settings_mock(canvas, layout):
     return x, y, w, h
 
 
+def place_settings_screenshot(canvas, layout, screenshot_path):
+    x, y, target_w, _ = layout["mock_box"]
+    img = Image.open(screenshot_path).convert("RGB")
+    scale = target_w / img.width
+    new_h = int(img.height * scale)
+    img = img.resize((target_w, new_h), Image.Resampling.LANCZOS)
+    canvas.paste(img, (x, y))
+    return x, y, target_w, new_h
+
+
 def render_screen(doc, screenshot_path, output_path):
     title = doc["title"].lower()
     if "profile" in title:
@@ -252,7 +331,7 @@ def render_screen(doc, screenshot_path, output_path):
     f_subtitle = load_font(20)
     f_box_title = load_font(25, True)
     f_box_body = load_font(20)
-    f_footer = load_font(15)
+    f_footer = f_box_body
 
     header = doc["sections"].get("Header", {})
     draw.text((56, 40), header.get("title", doc["title"]), fill="#111111", font=f_title)
@@ -265,7 +344,10 @@ def render_screen(doc, screenshot_path, output_path):
             yy += 24
 
     if screen_key == "settings":
-        wx, wy, watch_w, watch_h = place_settings_mock(canvas, layout)
+        if screenshot_path and Path(screenshot_path).exists():
+            wx, wy, watch_w, watch_h = place_settings_screenshot(canvas, layout, screenshot_path)
+        else:
+            wx, wy, watch_w, watch_h = place_settings_mock(canvas, layout)
 
         def to_canvas_point(point):
             return (wx + int(point[0]) - 20, wy + int(point[1]))
@@ -275,7 +357,17 @@ def render_screen(doc, screenshot_path, output_path):
         def to_canvas_point(point):
             return (wx + int(point[0]), wy + int(point[1]))
 
-    for section_name, section_layout in layout["sections"].items():
+    sections_layout = dict(layout["sections"])
+    if screen_key == "settings" and "Profile 1" in sections_layout and "Profile 3" in sections_layout:
+        p1_bx, p1_by, p1_bw = sections_layout["Profile 1"]["box"]
+        p1_body = doc["sections"].get("Profile 1", {}).get("description", "")
+        p1_lines = layout_lines(draw, p1_body, f_box_body, p1_bw - 32)
+        p1_height = 32 + 30 + len(p1_lines) * 24
+        p3 = sections_layout["Profile 3"]
+        p3_new_by = p1_by + p1_height + 20
+        sections_layout["Profile 3"] = {**p3, "box": (p3["box"][0], p3_new_by, p3["box"][2])}
+
+    for section_name, section_layout in sections_layout.items():
         if screen_key == "settings" and section_name == "Header":
             continue
         section = doc["sections"].get(section_name, {})
@@ -298,8 +390,8 @@ def render_screen(doc, screenshot_path, output_path):
     footer_box = layout["footer_box"]
     bx, by, bw, bh = footer_box
     footer_subtitle = footer.get("subtitle", "")
-    footer_lines = wrap_text(draw, footer_subtitle, f_footer, bw - 60) if footer_subtitle else []
-    footer_height = 14 + 24 + max(1, len(footer_lines)) * 20
+    footer_lines = wrap_text(draw, footer_subtitle, f_footer, bw - bx - 48) if footer_subtitle else []
+    footer_height = 14 + 24 + max(1, len(footer_lines)) * 24
     footer_box = (bx, by, bw, min(bh, by + footer_height))
     draw.rounded_rectangle(footer_box, radius=12, fill="#e6f0ff", outline="#8ab2e6", width=2)
     draw.text((bx + 24, by + 10), footer.get("title", ""), fill="#1f4f84", font=f_box_title)
@@ -307,7 +399,7 @@ def render_screen(doc, screenshot_path, output_path):
         yy = by + 38
         for line in footer_lines:
             draw.text((bx + 24, yy), line, fill="#1f4f84", font=f_footer)
-            yy += 20
+            yy += 24
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(output_path)

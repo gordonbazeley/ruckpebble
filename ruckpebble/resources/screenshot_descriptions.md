@@ -8,13 +8,12 @@
 ## Profiles
 - description: You can define up to three profiles which define ruck weight, terrain and gradient.
             They'll impact the number of calories burnt when rucking.
-            Select one of them here.
 
 ## Footer
 - title: How to use
-- subtitle: Up and Down - Move between profiles
-            Select - Start ruck with the highlighted profile
-            Back - Exit to Pebble menu
+- subtitle: ↑ ↓ Move between profiles
+            •   Start ruck with the highlighted profile
+            ←   Exit to Pebble menu
 
 ---
 
@@ -33,7 +32,8 @@
 - description: Pace per kilometre or mile over last minute.
 
 ## Steps
-- description: The first line shows steps for the current ruck session. The second line shows total steps for today.
+- description: The first line shows steps for the current ruck session. 
+               The second line shows total steps for today.
 
 ## Watch Time
 - description: Current time.
@@ -48,13 +48,14 @@
 - description: Time elapsed for the active ruck session.
 
 ## Calories
-- description: The first line shows the estimated calories for selected profile. The second line shows calories for an unweighted walk for comparison.
+- description: The first line shows the estimated calories for selected profile. 
+               The second line shows calories for an unweighted walk for comparison.
 
 ## Footer
 - title: How to use
-- subtitle: Up: Music
-            Down: Saves the current ruck session and creates a timeline pin.
-            Back: Gives a choice between resuming current session and discarding it.
+- subtitle: ↑ Music
+            ↓ Saves the current ruck session and creates a timeline pin.
+            ← Gives a choice between resuming current session, saving it or discarding it.
 
 ---
 
@@ -68,6 +69,12 @@
 
 ## Profile 1
 - description: Sets the name, ruck weight, terrain, and grade used when this profile is selected on the watch.
+               * Ruck weight - The more weight you carry the more calories you burn.
+               * Terrain - The trickier the terrain the more calories you burn.
+               * Grade - The steeper the terrain the more calories you burn. 
+                 * But … on a ruck you won't be going up a constant grade. 
+                 * Instead if your mapping software includes an "energy equivalent grade" you can use that.
+                 * Or calculate it yourself as Total ascent (metres) / (0.5 × Distance (kilometres)
 
 ## Profile 2
 - description: Second profile with the same fields as Profile 1. Use it for an alternate ruck setup such as a different ruck weight or terrain.

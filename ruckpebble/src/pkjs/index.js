@@ -497,7 +497,7 @@
 
   function insertTimelinePin(activity) {
     function sendTimelineStatus(text) {
-      Pebble.sendAppMessage({ timeline_status_text: text }, function() {
+      Pebble.sendAppMessage({ timeline_status_text: '💾 ' + text }, function() {
         console.log('timeline status sent:', text);
       }, function(err) {
         console.log('timeline status send failed:', text, JSON.stringify(err));
