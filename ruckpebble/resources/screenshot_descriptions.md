@@ -12,7 +12,8 @@
 ## Footer
 - title: How to use
 - subtitle: ↑ ↓ Move between profiles
-            •   Start ruck with the highlighted profile
+            •   Start a ruck with selected profile
+                NB. if a ruck is in progress you'll be given the option to resume it
             ←   Exit to Pebble menu
 
 ---
@@ -34,6 +35,7 @@
 ## Steps
 - description: The first line shows steps for the current ruck session. 
                The second line shows total steps for today.
+               NB. Steps are from Pebble health and are updated every ten seconds or so.
 
 ## Watch Time
 - description: Current time.
@@ -55,7 +57,10 @@
 - title: How to use
 - subtitle: ↑ Music
             ↓ Saves the current ruck session and creates a timeline pin.
-            ← Gives a choice between resuming current session, saving it or discarding it.
+            ← Either
+              * Return to Pebble menu, leaving current ruck rucking
+              * Save current ruck session
+              * Discard current ruck session
 
 ---
 

@@ -21,13 +21,13 @@ SCREEN_LAYOUTS = {
             "Session Pace": {"anchor": (42, 56), "box": (50, 338, 430), "side": "left"},
             "Current Pace": {"anchor": (60, 100), "box": (50, 500, 430), "side": "left"},
             "Steps": {"anchor": (58, 188), "box": (50, 675, 405), "side": "left"},
-            "Watch Time": {"anchor": (172, 20), "box": (1045, 175, 405), "side": "right"},
+            "Watch Time": {"anchor": (172, 20), "box": (1045, 215, 405), "side": "right"},
             "Distance": {"anchor": (164, 56), "box": (1045, 338, 405), "side": "right"},
             "Elapsed Time": {"anchor": (154, 104), "box": (1045, 500, 405), "side": "right"},
             "Heart Rate": {"anchor": (102, 104), "box": (1045, 620, 405), "side": "right"},
             "Calories": {"anchor": (152, 188), "box": (1045, 760, 405), "side": "right"},
         },
-        "footer_box": (910, 20, 1490, 190),
+        "footer_box": (910, 20, 1490, 280),
     },
     "settings": {
         "canvas_size": (1800, 1700),
@@ -390,15 +390,15 @@ def render_screen(doc, screenshot_path, output_path):
     footer_box = layout["footer_box"]
     bx, by, bw, bh = footer_box
     footer_subtitle = footer.get("subtitle", "")
-    footer_lines = wrap_text(draw, footer_subtitle, f_footer, bw - bx - 48) if footer_subtitle else []
+    footer_lines = layout_lines(draw, footer_subtitle, f_footer, bw - bx - 48) if footer_subtitle else []
     footer_height = 14 + 24 + max(1, len(footer_lines)) * 24
     footer_box = (bx, by, bw, min(bh, by + footer_height))
     draw.rounded_rectangle(footer_box, radius=12, fill="#e6f0ff", outline="#8ab2e6", width=2)
     draw.text((bx + 24, by + 10), footer.get("title", ""), fill="#1f4f84", font=f_box_title)
     if footer_lines:
         yy = by + 38
-        for line in footer_lines:
-            draw.text((bx + 24, yy), line, fill="#1f4f84", font=f_footer)
+        for line_text, x_off in footer_lines:
+            draw.text((bx + 24 + x_off, yy), line_text, fill="#1f4f84", font=f_footer)
             yy += 24
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
