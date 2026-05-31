@@ -33,9 +33,8 @@ typedef struct {
 } Settings;
 
 typedef enum {
-  RUCK_PROMPT_MODE_BACK    = 0,
-  RUCK_PROMPT_MODE_DOWN    = 1,
-  RUCK_PROMPT_MODE_PROFILE = 2,
+  RUCK_PROMPT_MODE_BACK = 0,
+  RUCK_PROMPT_MODE_DOWN = 1,
 } RuckPromptMode;
 
 enum {
@@ -123,7 +122,6 @@ static int16_t s_profile_cell_height = PROFILE_ROW_HEIGHT;
 
 static Settings s_settings;
 static bool s_session_active = false;
-static int32_t s_profile_pending_row = 0;
 static time_t s_start_time;
 static bool s_health_available = false;
 static bool s_health_subscribed = false;
@@ -173,6 +171,7 @@ static int32_t prv_active_profile_index(void) {
 }
 
 static void prv_status_timer_callback(void *context);
+static void prv_ruck_prompt_pebble_menu(void);
 static void prv_show_status_message(const char *text, uint32_t duration_ms);
 static void prv_health_handler(HealthEventType event, void *context);
 static void prv_reset_session_state(void);
@@ -552,11 +551,6 @@ static void prv_update_display(void) {
 
   int64_t stride_mm = prv_stride_to_mm(s_settings.stride_value, s_settings.stride_unit);
   int64_t distance_mm = (int64_t)steps * stride_mm;
-  if (s_health_available) {
-    int history_index = (int)(now % PACE_HISTORY_SECONDS);
-    s_step_history_time[history_index] = now;
-    s_step_history[history_index] = steps_total_day;
-  }
   if (s_last_time == 0) {
     s_last_time = now;
     s_last_steps = steps;
@@ -623,6 +617,13 @@ static void prv_update_display(void) {
     current_pace_sec = session_pace_display_sec;
   }
   s_current_pace_sec = (int32_t)current_pace_sec;
+
+  // Write step history AFTER reading it for pace, because both use now % PACE_HISTORY_SECONDS.
+  if (s_health_available) {
+    int history_index = (int)(now % PACE_HISTORY_SECONDS);
+    s_step_history_time[history_index] = now;
+    s_step_history[history_index] = steps_total_day;
+  }
 
   ProfileSettings *profile = prv_active_profile();
   int64_t weight_kg1000 = prv_weight_to_kg1000(s_settings.weight_value, s_settings.weight_unit);
@@ -1011,14 +1012,6 @@ static void prv_profile_select_callback(MenuLayer *menu_layer, MenuIndex *cell_i
   if (cell_index->row >= PROFILE_COUNT) {
     return;
   }
-  if (s_session_active) {
-    s_profile_pending_row = (int32_t)cell_index->row;
-    s_ruck_prompt_mode = RUCK_PROMPT_MODE_PROFILE;
-    if (!window_stack_contains_window(s_ruck_prompt_window)) {
-      window_stack_push(s_ruck_prompt_window, true);
-    }
-    return;
-  }
   s_settings.active_profile = cell_index->row;
   prv_save_settings();
   prv_start_session();
@@ -1070,7 +1063,6 @@ static void prv_profile_click_config_provider(void *context) {
 static void prv_main_back_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
-  // Ask before discarding or resuming the current ruck.
   if (!window_stack_contains_window(s_ruck_prompt_window)) {
     s_ruck_prompt_mode = RUCK_PROMPT_MODE_BACK;
     window_stack_push(s_ruck_prompt_window, true);
@@ -1116,45 +1108,21 @@ static void prv_ruck_prompt_select(void) {
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_DOWN) {
     if (s_ruck_prompt_selected_row == 0) {
       prv_ruck_prompt_save();
-    } else {
+    } else if (s_ruck_prompt_selected_row == 1) {
       prv_ruck_prompt_resume();
-    }
-    return;
-  }
-
-  if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_PROFILE) {
-    if (s_ruck_prompt_selected_row == 0) {
-      // Resume current ruck — dismiss prompt and profile window, return to tracking screen
-      if (window_stack_contains_window(s_ruck_prompt_window)) {
-        window_stack_remove(s_ruck_prompt_window, true);
-      }
-      if (window_stack_contains_window(s_profile_window)) {
-        window_stack_remove(s_profile_window, true);
-      }
-      prv_update_display();
     } else {
-      // Start new ruck with the newly selected profile
-      s_settings.active_profile = s_profile_pending_row;
-      prv_save_settings();
-      prv_start_session();
-      if (window_stack_contains_window(s_ruck_prompt_window)) {
-        window_stack_remove(s_ruck_prompt_window, true);
-      }
-      if (window_stack_contains_window(s_profile_window)) {
-        window_stack_remove(s_profile_window, true);
-      }
-      prv_update_display();
+      prv_ruck_prompt_discard();
     }
     return;
   }
 
   // RUCK_PROMPT_MODE_BACK
   if (s_ruck_prompt_selected_row == 0) {
-    prv_ruck_prompt_pebble_menu();
+    prv_ruck_prompt_discard();
   } else if (s_ruck_prompt_selected_row == 1) {
     prv_ruck_prompt_save();
   } else {
-    prv_ruck_prompt_discard();
+    prv_ruck_prompt_resume();
   }
 }
 
@@ -1170,8 +1138,7 @@ static void prv_ruck_prompt_up_click_handler(ClickRecognizerRef recognizer, void
 static void prv_ruck_prompt_down_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
-  int32_t max_row = (s_ruck_prompt_mode == RUCK_PROMPT_MODE_DOWN ||
-                     s_ruck_prompt_mode == RUCK_PROMPT_MODE_PROFILE) ? 1 : 2;
+  int32_t max_row = 2;
   if (s_ruck_prompt_selected_row < max_row) {
     s_ruck_prompt_selected_row += 1;
   }
@@ -1203,24 +1170,17 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   const int16_t pad = 8;
   const int16_t row_w = bounds.size.w - 2 * pad;
 
-  static const char *k_titles_back[]    = { "Pebble menu", "Save ruck", "Discard ruck" };
-  static const char *k_titles_down[]    = { "Save ruck", "Resume ruck" };
-  static const char *k_titles_profile[] = { "Resume current ruck", "Start new ruck" };
-
+  static const char *k_titles_back[]    = { "Discard ruck", "Save ruck", "Resume ruck" };
+  static const char *k_titles_down[]    = { "Save ruck", "Resume ruck", "Discard ruck" };
   const char **titles;
   int row_count;
-  GFont font;
-  int16_t row_h;
+  GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
+  int16_t row_h = 36;
 
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_DOWN) {
-    titles = k_titles_down; row_count = 2;
-    font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD); row_h = 36;
-  } else if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_PROFILE) {
-    titles = k_titles_profile; row_count = 2;
-    font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD); row_h = 44;
+    titles = k_titles_down; row_count = 3;
   } else {
     titles = k_titles_back; row_count = 3;
-    font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD); row_h = 36;
   }
 
   graphics_context_set_fill_color(ctx, GColorBlack);
@@ -1247,8 +1207,7 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
 static void prv_ruck_prompt_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   s_ruck_prompt_selected_row = 0;
-  if (s_ruck_prompt_mode != RUCK_PROMPT_MODE_DOWN &&
-      s_ruck_prompt_mode != RUCK_PROMPT_MODE_PROFILE) {
+  if (s_ruck_prompt_mode != RUCK_PROMPT_MODE_DOWN) {
     s_ruck_prompt_mode = RUCK_PROMPT_MODE_BACK;
   }
   s_ruck_prompt_layer = layer_create(layer_get_bounds(window_layer));
@@ -1347,9 +1306,7 @@ static void prv_status_timer_callback(void *context) {
   if (window_stack_contains_window(s_status_window)) {
     window_stack_remove(s_status_window, true);
   }
-  if (!window_stack_contains_window(s_profile_window)) {
-    window_stack_push(s_profile_window, true);
-  }
+  window_stack_pop_all(true);
 }
 
 static void prv_status_layer_update_proc(Layer *layer, GContext *ctx) {

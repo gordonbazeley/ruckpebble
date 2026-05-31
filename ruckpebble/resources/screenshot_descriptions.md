@@ -12,8 +12,7 @@
 ## Footer
 - title: How to use
 - subtitle: ↑ ↓ Move between profiles
-            •   Start a ruck with selected profile
-                NB. if a ruck is in progress you'll be given the option to resume it
+            •   Start ruck with selected profile
             ←   Exit to Pebble menu
 
 ---
@@ -56,11 +55,8 @@
 ## Footer
 - title: How to use
 - subtitle: ↑ Music
-            ↓ Saves the current ruck session and creates a timeline pin.
-            ← Either
-              * Return to Pebble menu, leaving current ruck rucking
-              * Save current ruck session
-              * Discard current ruck session
+            ↓ Saves the current ruck session and creates a timeline pin
+            ← Discard current ruck session and return to profile screen
 
 ---
 

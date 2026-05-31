@@ -299,6 +299,17 @@
       '</style></head><body>' +
       '<h1>Ruck Settings</h1>' +
 
+      '<div class="card"><h2>Estimated calories per hour</h2>' +
+      '<label>Pace</label>' +
+      '<select id="chart_speed" onchange="redrawChart()">' +
+      '<option value="20">20 min/km</option>' +
+      '<option value="15">15 min/km</option>' +
+      '<option value="12" selected>12 min/km</option>' +
+      '<option value="10">10 min/km</option>' +
+      '</select>' +
+      '<div id="calorie_chart" style="margin-top:14px;"></div>' +
+      '</div>' +
+
       '<div class="card"><h2>Shared</h2>' +
       '<label>Body weight</label>' +
       '<div class="row"><div><input type="number" id="weight_value" step="0.1"></div>' +
@@ -370,6 +381,48 @@
       'if(t==="sand"){return 150;}' +
       'if(t==="snow"){return 150;}' +
       'return 130;}' +
+      'function walkKcalHr(wKg,spKmh,gradePct){' +
+      'var sm=spKmh*1000/60;' +
+      'var vo2=3.5+0.1*sm+1.8*sm*(gradePct/100);' +
+      'return vo2*wKg*60/200;}' +
+      'function ruckKcalHr(wKg,lKg,spKmh,t100,gradeTenths){' +
+      'if(wKg<=0)return 0;' +
+      'var V=spKmh/3.6,G=gradeTenths/1000,T=t100/100;' +
+      'var tot=wKg+lKg,ratio=lKg/wKg;' +
+      'var t1=1.5*wKg,t2=2*tot*ratio*ratio;' +
+      'var inner=1.5*V*V+0.35*V*G;' +
+      'var mult=(1+Math.sqrt(0.3*V*V)/7+Math.pow(V*ratio,2)/4)*1.1;' +
+      'var kcal=(t1+t2+T*tot*inner*mult)*3600/4184;' +
+      'var wk=walkKcalHr(wKg,spKmh,gradeTenths/10);' +
+      'if(lKg>0&&kcal<wk)kcal=wk+wk*(lKg/wKg);' +
+      'return kcal;}' +
+      'function redrawChart(){' +
+      'var paceMinKm=parseFloat($("chart_speed").value)||12;' +
+      'var sp=60/paceMinKm;' +
+      'var wv=parseFloat($("weight_value").value)||0;' +
+      'var wkg=$("weight_unit").value==="1"?wv*0.453592:wv;' +
+      'var ru=$("ruck_weight_unit").value;' +
+      'function kg(id){var v=parseFloat($(id).value)||0;return ru==="1"?v*0.453592:v;}' +
+      'function gr(id){return(parseInt($(id).value,10)||0)*10;}' +
+      'function tf(id){return terrainFactorFromType($(id).value);}' +
+      'var wk=Math.round(walkKcalHr(wkg,sp,0));' +
+      'var bars=[' +
+      '{label:"Walk",kcal:wk,col:"#888"},' +
+      '{label:$("p1_name").value||"P1",kcal:Math.round(ruckKcalHr(wkg,kg("p1_ruck_weight_value"),sp,tf("p1_terrain_type"),gr("p1_grade_percent"))),col:"#e45545"},' +
+      '{label:$("p2_name").value||"P2",kcal:Math.round(ruckKcalHr(wkg,kg("p2_ruck_weight_value"),sp,tf("p2_terrain_type"),gr("p2_grade_percent"))),col:"#e45545"},' +
+      '{label:$("p3_name").value||"P3",kcal:Math.round(ruckKcalHr(wkg,kg("p3_ruck_weight_value"),sp,tf("p3_terrain_type"),gr("p3_grade_percent"))),col:"#e45545"}' +
+      '];' +
+      'var mx=Math.max.apply(null,bars.map(function(b){return b.kcal;}));' +
+      'var html=bars.map(function(b){' +
+      'var pct=mx>0?(b.kcal/mx*100):0;' +
+      'return"<div style=\'display:flex;align-items:center;margin-bottom:8px;\'>"' +
+      '+"<div style=\'width:80px;font-size:12px;color:#555;flex-shrink:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;\'>"+b.label+"</div>"' +
+      '+"<div style=\'flex:1;background:#f0f0f0;border-radius:4px;height:24px;position:relative;\'>"' +
+      '+"<div style=\'background:"+b.col+";width:"+pct.toFixed(1)+"%;height:100%;border-radius:4px;\'></div>"' +
+      '+"<span style=\'position:absolute;right:6px;top:4px;font-size:13px;font-weight:600;color:#333;\'>"+b.kcal+" kcal</span>"' +
+      '+"</div></div>";' +
+      '}).join("");' +
+      '$("calorie_chart").innerHTML=html;}' +
       'function queryParam(name){' +
       'var m=RegExp("[?&]"+name+"=([^&]*)").exec(location.search);' +
       'return m?decodeURIComponent(m[1]):"";' +
@@ -412,6 +465,12 @@
       '}' +
       'applyToForm(s);' +
       '$("ruck_weight_unit").addEventListener("change",updateRuckWeightLabels);' +
+      '["chart_speed","weight_value","weight_unit","ruck_weight_unit",' +
+      '"p1_ruck_weight_value","p1_terrain_type","p1_grade_percent","p1_name",' +
+      '"p2_ruck_weight_value","p2_terrain_type","p2_grade_percent","p2_name",' +
+      '"p3_ruck_weight_value","p3_terrain_type","p3_grade_percent","p3_name"' +
+      '].forEach(function(id){var el=$(id);if(el){el.addEventListener("change",redrawChart);el.addEventListener("input",redrawChart);}});' +
+      'redrawChart();' +
       '$("reset_defaults").addEventListener("click",function(){' +
       's=copy(d);' +
       'applyToForm(s);' +
@@ -497,7 +556,7 @@
 
   function insertTimelinePin(activity) {
     function sendTimelineStatus(text) {
-      Pebble.sendAppMessage({ timeline_status_text: '💾 ' + text }, function() {
+      Pebble.sendAppMessage({ timeline_status_text: text }, function() {
         console.log('timeline status sent:', text);
       }, function(err) {
         console.log('timeline status send failed:', text, JSON.stringify(err));
