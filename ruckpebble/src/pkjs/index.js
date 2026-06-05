@@ -1,7 +1,6 @@
 /* Settings page for Pebble app with shared settings + 3 profiles. */
 (function() {
   var SETTINGS_KEY = 'ruck_settings_v2';
-  var DEBUG_TIMELINE_PIN_KEY = 'ruck_debug_timeline_pin_v1';
   var KEY_INSERT_TIMELINE_PIN = 10020;
   var KEY_REQUEST_LIFETIME_TOTALS = 10022;
   var KEY_LIFETIME_DISTANCE_M_TOTAL = 10023;
@@ -76,21 +75,6 @@
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }
 
-  function saveDebugTimelinePin(pin) {
-    localStorage.setItem(DEBUG_TIMELINE_PIN_KEY, JSON.stringify(pin));
-  }
-
-  function loadDebugTimelinePin() {
-    var raw = localStorage.getItem(DEBUG_TIMELINE_PIN_KEY);
-    if (!raw) {
-      return null;
-    }
-    try {
-      return JSON.parse(raw);
-    } catch (e) {
-      return null;
-    }
-  }
 
   function hasOwn(obj, key) {
     return Object.prototype.hasOwnProperty.call(obj, key);
@@ -265,9 +249,6 @@
 
   function openConfig(settingsSnapshot) {
     var s = normalizeSettings(settingsSnapshot || s_latestSettingsSnapshot || loadSettings());
-    var p1TerrainType = terrainTypeFromSettings(s.profile1_terrain_type, s.profile1_terrain_factor);
-    var p2TerrainType = terrainTypeFromSettings(s.profile2_terrain_type, s.profile2_terrain_factor);
-    var p3TerrainType = terrainTypeFromSettings(s.profile3_terrain_type, s.profile3_terrain_factor);
     var terrainOptions = terrainOptionsHtml();
     function svgIcon(body) {
       return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">' + body + '</svg>');
@@ -407,10 +388,10 @@
       'function tf(id){return terrainFactorFromType($(id).value);}' +
       'var wk=Math.round(walkKcalHr(wkg,sp,0));' +
       'var bars=[' +
-      '{label:"Walk",kcal:wk,col:"#888"},' +
+      '{label:"Walk",kcal:wk,col:"#888888"},' +
       '{label:$("p1_name").value||"P1",kcal:Math.round(ruckKcalHr(wkg,kg("p1_ruck_weight_value"),sp,tf("p1_terrain_type"),gr("p1_grade_percent"))),col:"#e45545"},' +
-      '{label:$("p2_name").value||"P2",kcal:Math.round(ruckKcalHr(wkg,kg("p2_ruck_weight_value"),sp,tf("p2_terrain_type"),gr("p2_grade_percent"))),col:"#e45545"},' +
-      '{label:$("p3_name").value||"P3",kcal:Math.round(ruckKcalHr(wkg,kg("p3_ruck_weight_value"),sp,tf("p3_terrain_type"),gr("p3_grade_percent"))),col:"#e45545"}' +
+      '{label:$("p2_name").value||"P2",kcal:Math.round(ruckKcalHr(wkg,kg("p2_ruck_weight_value"),sp,tf("p2_terrain_type"),gr("p2_grade_percent"))),col:"#4a90d9"},' +
+      '{label:$("p3_name").value||"P3",kcal:Math.round(ruckKcalHr(wkg,kg("p3_ruck_weight_value"),sp,tf("p3_terrain_type"),gr("p3_grade_percent"))),col:"#5cb85c"}' +
       '];' +
       'var mx=Math.max.apply(null,bars.map(function(b){return b.kcal;}));' +
       'var html=bars.map(function(b){' +
@@ -524,10 +505,6 @@
     s_latestSettingsSnapshot = normalizeSettings(loadSettings());
     syncSettingsToWatch(s_latestSettingsSnapshot);
     requestLifetimeTotals();
-    var debugPin = loadDebugTimelinePin();
-    if (debugPin) {
-      console.log('last cached timeline pin:', JSON.stringify(debugPin));
-    }
   });
 
   function buildTimelinePin(activity) {
@@ -564,7 +541,6 @@
     }
 
     var pin = buildTimelinePin(activity);
-    saveDebugTimelinePin(pin);
     console.log('timeline pin payload:', JSON.stringify(pin));
 
     Pebble.getTimelineToken(function(token) {

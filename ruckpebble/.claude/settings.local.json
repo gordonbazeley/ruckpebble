@@ -22,7 +22,8 @@
       "Bash(unset PYTHONHOME)",
       "Bash(echo \"exit: $?\")",
       "Bash(python3 -c ' *)",
-      "Bash(python3 -W all -c ' *)"
+      "Bash(python3 -W all -c ' *)",
+      "Bash(./create_screenshots.sh)"
     ]
   }
 }

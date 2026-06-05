@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+
 #define PROFILE_COUNT 3
 #define PROFILE_NAME_MAX_LEN 33
 #define TERRAIN_TYPE_MAX_LEN 16
@@ -9,7 +10,6 @@
 #define PROFILE_ROW_HEIGHT 62
 #define PROFILE_ROW_SEPARATOR_HEIGHT 1
 #define PROFILE_GRADE_TEXT_WIDTH 30
-#define PROFILE_TERRAIN_BONUS_WIDTH 0
 #define PACE_HISTORY_SECONDS 60
 
 typedef struct {
@@ -33,8 +33,9 @@ typedef struct {
 } Settings;
 
 typedef enum {
-  RUCK_PROMPT_MODE_BACK = 0,
-  RUCK_PROMPT_MODE_DOWN = 1,
+  RUCK_PROMPT_MODE_BACK    = 0,
+  RUCK_PROMPT_MODE_DOWN    = 1,
+  RUCK_PROMPT_MODE_RESTORE = 2,
 } RuckPromptMode;
 
 enum {
@@ -51,6 +52,8 @@ enum {
   SESSION_RESUME_START_TIME_PERSIST_KEY = 11,
   SESSION_RESUME_DISTANCE_M_PERSIST_KEY = 12,
   SESSION_RESUME_CALORIES_PERSIST_KEY  = 13,
+  SESSION_RESUME_ELAPSED_S_PERSIST_KEY = 14,
+  SESSION_RESUME_PROFILE_PERSIST_KEY   = 15,
 };
 
 #define APP_STATE_SCHEMA_VERSION 2
@@ -83,8 +86,6 @@ static const Settings SETTINGS_DEFAULTS = {
 
 static Window *s_profile_window;
 static MenuLayer *s_profile_menu_layer;
-static Window *s_music_window;
-static MenuLayer *s_music_menu_layer;
 static Window *s_status_window;
 static Layer *s_status_layer;
 static AppTimer *s_status_timer;
@@ -122,6 +123,7 @@ static int16_t s_profile_cell_height = PROFILE_ROW_HEIGHT;
 
 static Settings s_settings;
 static bool s_session_active = false;
+static bool s_post_save_stay = false;
 static time_t s_start_time;
 static bool s_health_available = false;
 static bool s_health_subscribed = false;
@@ -132,6 +134,12 @@ static time_t s_last_time = 0;
 static int64_t s_speed_mmps = 0;
 static int32_t s_session_distance_m = 0;
 static int32_t s_session_calories = 0;
+static int32_t s_session_distance_offset_m = 0;
+static bool s_session_paused = false;
+static time_t s_pause_start_time = 0;
+static int32_t s_pause_total_s = 0;
+static int32_t s_steps_at_pause = 0;
+static Layer *s_paused_icon_layer = NULL;
 static int32_t s_lifetime_distance_m = 0;
 static int32_t s_lifetime_calories = 0;
 static bool s_session_totals_committed = false;
@@ -142,7 +150,6 @@ static int32_t s_last_activity_duration_sec = 0;
 static int32_t s_last_activity_timestamp  = 0;
 static int32_t s_session_pace_sec         = 0;
 static int32_t s_current_pace_sec         = 0;
-static int32_t s_smoothed_pace_sec        = 0;
 static char s_status_text[64] = "Saving ruck...";
 static int32_t s_step_history[PACE_HISTORY_SECONDS];
 static time_t s_step_history_time[PACE_HISTORY_SECONDS];
@@ -401,10 +408,18 @@ static void prv_grid_layer_update_proc(Layer *layer, GContext *ctx) {
 }
 
 static void prv_save_in_progress_session(void) {
+  time_t now = time(NULL);
+  int32_t pause_total = s_pause_total_s;
+  if (s_session_paused) {
+    pause_total += (int32_t)(now - s_pause_start_time);
+  }
+  int32_t elapsed_s = (int32_t)(now - s_start_time) - pause_total;
+  if (elapsed_s < 0) elapsed_s = 0;
   persist_write_int(SESSION_IN_PROGRESS_PERSIST_KEY, 1);
-  persist_write_int(SESSION_RESUME_START_TIME_PERSIST_KEY, (int32_t)s_start_time);
+  persist_write_int(SESSION_RESUME_ELAPSED_S_PERSIST_KEY, elapsed_s);
   persist_write_int(SESSION_RESUME_DISTANCE_M_PERSIST_KEY, s_session_distance_m);
   persist_write_int(SESSION_RESUME_CALORIES_PERSIST_KEY, s_session_calories);
+  persist_write_int(SESSION_RESUME_PROFILE_PERSIST_KEY, (int32_t)s_settings.active_profile);
 }
 
 static void prv_clear_in_progress_session(void) {
@@ -412,17 +427,38 @@ static void prv_clear_in_progress_session(void) {
 }
 
 static bool prv_load_in_progress_session(void) {
-  if (!persist_exists(SESSION_IN_PROGRESS_PERSIST_KEY) ||
-      persist_read_int(SESSION_IN_PROGRESS_PERSIST_KEY) == 0) {
+  return persist_exists(SESSION_IN_PROGRESS_PERSIST_KEY) &&
+         persist_read_int(SESSION_IN_PROGRESS_PERSIST_KEY) != 0;
+}
+
+static bool prv_has_resumable_session_for_profile(int32_t profile_index) {
+  if (!prv_load_in_progress_session()) {
     return false;
   }
-  s_start_time = (time_t)persist_read_int(SESSION_RESUME_START_TIME_PERSIST_KEY);
-  s_session_distance_m = persist_read_int(SESSION_RESUME_DISTANCE_M_PERSIST_KEY);
-  s_session_calories = persist_read_int(SESSION_RESUME_CALORIES_PERSIST_KEY);
+  if (!persist_exists(SESSION_RESUME_PROFILE_PERSIST_KEY)) {
+    return false;
+  }
+  return persist_read_int(SESSION_RESUME_PROFILE_PERSIST_KEY) == profile_index;
+}
+
+static void prv_resume_in_progress_session(void) {
+  time_t now = time(NULL);
+  int32_t saved_elapsed_s = persist_exists(SESSION_RESUME_ELAPSED_S_PERSIST_KEY) ?
+      persist_read_int(SESSION_RESUME_ELAPSED_S_PERSIST_KEY) : 0;
+
+  prv_reset_session_state();
+  s_session_distance_offset_m = persist_exists(SESSION_RESUME_DISTANCE_M_PERSIST_KEY) ?
+      persist_read_int(SESSION_RESUME_DISTANCE_M_PERSIST_KEY) : 0;
+  s_session_distance_m = s_session_distance_offset_m;
+
+  s_start_time = now - (time_t)saved_elapsed_s;
   s_session_active = true;
-  APP_LOG(APP_LOG_LEVEL_INFO, "Resumed in-progress session: start=%ld dist=%ld cal=%ld",
-          (long)s_start_time, (long)s_session_distance_m, (long)s_session_calories);
-  return true;
+
+  prv_ensure_health_subscription(now);
+  s_steps_baseline = s_health_available ? prv_current_step_count(now) : 0;
+
+  APP_LOG(APP_LOG_LEVEL_INFO, "Resumed session: elapsed=%lds dist_offset=%ldm",
+          (long)saved_elapsed_s, (long)s_session_distance_offset_m);
 }
 
 static void prv_load_settings(void) {
@@ -524,13 +560,30 @@ static void prv_commit_session_totals(const char *reason) {
           (long)s_lifetime_distance_m, (long)s_lifetime_calories);
 }
 
+static void prv_paused_icon_layer_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  const int16_t bar_w = 14;
+  const int16_t bar_h = 44;
+  const int16_t gap = 12;
+  const int16_t total_w = bar_w * 2 + gap;
+  int16_t left_x = (bounds.size.w - total_w) / 2;
+  int16_t right_x = left_x + bar_w + gap;
+  int16_t top_y = (bounds.size.h - bar_h) / 2;
+  graphics_context_set_fill_color(ctx, GColorVividCerulean);
+  graphics_fill_rect(ctx, GRect(left_x, top_y, bar_w, bar_h), 4, GCornersAll);
+  graphics_fill_rect(ctx, GRect(right_x, top_y, bar_w, bar_h), 4, GCornersAll);
+}
+
 static void prv_update_display(void) {
   if (!s_top_time_layer) {
     return;
   }
   time_t now = time(NULL);
   prv_ensure_health_subscription(now);
-  int64_t elapsed_real_s = (int64_t)(now - s_start_time);
+  int64_t elapsed_real_s = (int64_t)(now - s_start_time) - (int64_t)s_pause_total_s;
+  if (s_session_paused) {
+    elapsed_real_s -= (int64_t)(now - s_pause_start_time);
+  }
   if (elapsed_real_s < 1) {
     elapsed_real_s = 1;
   }
@@ -548,9 +601,13 @@ static void prv_update_display(void) {
       steps = 0;
     }
   }
+  if (s_session_paused && steps > s_steps_at_pause) {
+    steps = s_steps_at_pause;
+  }
 
   int64_t stride_mm = prv_stride_to_mm(s_settings.stride_value, s_settings.stride_unit);
   int64_t distance_mm = (int64_t)steps * stride_mm;
+  int64_t total_distance_mm = distance_mm + (int64_t)s_session_distance_offset_m * 1000;
   if (s_last_time == 0) {
     s_last_time = now;
     s_last_steps = steps;
@@ -561,7 +618,7 @@ static void prv_update_display(void) {
   if (s_settings.sim_steps_enabled) {
     delta_scaled_s *= EMULATOR_TIME_SCALE;
   }
-  if (delta_scaled_s >= 5) {
+  if (!s_session_paused && delta_scaled_s >= 5) {
     int32_t delta_steps = steps - s_last_steps;
     if (delta_steps < 0) {
       delta_steps = 0;
@@ -578,13 +635,13 @@ static void prv_update_display(void) {
   bool use_imperial = (s_settings.weight_unit == 1);
   int64_t unit_mm = use_imperial ? 1609344 : 1000000;
   const char *distance_unit_label = use_imperial ? "mi" : "km";
-  int64_t distance_x100 = (distance_mm * 100) / unit_mm;
+  int64_t distance_x100 = (total_distance_mm * 100) / unit_mm;
 
   int64_t session_pace_display_sec = 0;
   int64_t session_pace_storage_sec = 0;
-  if (distance_mm > 0) {
-    session_pace_display_sec = (elapsed_s * unit_mm) / distance_mm;
-    session_pace_storage_sec = (elapsed_s * 1000000LL) / distance_mm;
+  if (total_distance_mm > 0) {
+    session_pace_display_sec = (elapsed_s * unit_mm) / total_distance_mm;
+    session_pace_storage_sec = (elapsed_s * 1000000LL) / total_distance_mm;
   }
   s_session_pace_sec = (int32_t)session_pace_storage_sec;
 
@@ -629,8 +686,8 @@ static void prv_update_display(void) {
   int64_t weight_kg1000 = prv_weight_to_kg1000(s_settings.weight_value, s_settings.weight_unit);
   int64_t load_kg1000 = prv_weight_to_kg1000(profile->ruck_weight_value, s_settings.ruck_weight_unit);
   int64_t session_speed_mmps = 0;
-  if (elapsed_s > 0 && distance_mm > 0) {
-    session_speed_mmps = distance_mm / elapsed_s;
+  if (elapsed_s > 0 && total_distance_mm > 0) {
+    session_speed_mmps = total_distance_mm / elapsed_s;
   }
   if (session_speed_mmps > 5000) {
     session_speed_mmps = 5000;
@@ -702,7 +759,7 @@ static void prv_update_display(void) {
   snprintf(calories_value_buf, sizeof(calories_value_buf), "%ld", (long)ruck_kcal_total);
   snprintf(calories_walk_value_buf, sizeof(calories_walk_value_buf), "%ld", (long)walk_kcal_total);
 
-  int64_t session_distance_m = distance_mm / 1000;
+  int64_t session_distance_m = total_distance_mm / 1000;
   if (session_distance_m < 0) {
     session_distance_m = 0;
   }
@@ -741,6 +798,10 @@ static void prv_update_display(void) {
   text_layer_set_text(s_bottom_left_secondary_layer, steps_total_value_buf);
   text_layer_set_text(s_bottom_right_value_layer, calories_value_buf);
   text_layer_set_text(s_bottom_right_secondary_layer, calories_walk_value_buf);
+
+  if (s_paused_icon_layer) {
+    layer_set_hidden(s_paused_icon_layer, !s_session_paused);
+  }
 }
 
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
@@ -899,7 +960,11 @@ static void prv_reset_session_state(void) {
   s_session_totals_committed = false;
   s_session_pace_sec = 0;
   s_current_pace_sec = 0;
-  s_smoothed_pace_sec = 0;
+  s_session_distance_offset_m = 0;
+  s_session_paused = false;
+  s_pause_start_time = 0;
+  s_pause_total_s = 0;
+  s_steps_at_pause = 0;
   memset(s_step_history, 0, sizeof(s_step_history));
   memset(s_step_history_time, 0, sizeof(s_step_history_time));
 }
@@ -1014,9 +1079,19 @@ static void prv_profile_select_callback(MenuLayer *menu_layer, MenuIndex *cell_i
   }
   s_settings.active_profile = cell_index->row;
   prv_save_settings();
-  prv_start_session();
-  window_stack_remove(s_profile_window, true);
-  prv_update_display();
+
+  if (prv_has_resumable_session_for_profile(s_settings.active_profile)) {
+    s_ruck_prompt_mode = RUCK_PROMPT_MODE_RESTORE;
+    s_ruck_prompt_selected_row = 0;
+    window_stack_remove(s_profile_window, true);
+    if (!window_stack_contains_window(s_ruck_prompt_window)) {
+      window_stack_push(s_ruck_prompt_window, true);
+    }
+  } else {
+    prv_start_session();
+    window_stack_remove(s_profile_window, true);
+    prv_update_display();
+  }
 }
 
 static void prv_profile_back_click_handler(ClickRecognizerRef recognizer, void *context) {
@@ -1116,6 +1191,24 @@ static void prv_ruck_prompt_select(void) {
     return;
   }
 
+  if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) {
+    if (s_ruck_prompt_selected_row == 0) {
+      prv_resume_in_progress_session();
+      if (window_stack_contains_window(s_ruck_prompt_window)) {
+        window_stack_remove(s_ruck_prompt_window, true);
+      }
+      prv_update_display();
+    } else {
+      prv_clear_in_progress_session();
+      prv_start_session();
+      if (window_stack_contains_window(s_ruck_prompt_window)) {
+        window_stack_remove(s_ruck_prompt_window, true);
+      }
+      prv_update_display();
+    }
+    return;
+  }
+
   // RUCK_PROMPT_MODE_BACK
   if (s_ruck_prompt_selected_row == 0) {
     prv_ruck_prompt_discard();
@@ -1138,7 +1231,7 @@ static void prv_ruck_prompt_up_click_handler(ClickRecognizerRef recognizer, void
 static void prv_ruck_prompt_down_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
-  int32_t max_row = 2;
+  int32_t max_row = (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) ? 1 : 2;
   if (s_ruck_prompt_selected_row < max_row) {
     s_ruck_prompt_selected_row += 1;
   }
@@ -1154,7 +1247,12 @@ static void prv_ruck_prompt_select_click_handler(ClickRecognizerRef recognizer, 
 static void prv_ruck_prompt_back_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
-  prv_ruck_prompt_resume();
+  if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) {
+    s_ruck_prompt_selected_row = 0;
+    prv_ruck_prompt_select();
+  } else {
+    prv_ruck_prompt_resume();
+  }
 }
 
 static void prv_ruck_prompt_click_config_provider(void *context) {
@@ -1172,6 +1270,7 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
 
   static const char *k_titles_back[]    = { "Discard ruck", "Save ruck", "Resume ruck" };
   static const char *k_titles_down[]    = { "Save ruck", "Resume ruck", "Discard ruck" };
+  static const char *k_titles_restore[] = { "Resume ruck", "Start new" };
   const char **titles;
   int row_count;
   GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
@@ -1179,6 +1278,8 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
 
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_DOWN) {
     titles = k_titles_down; row_count = 3;
+  } else if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) {
+    titles = k_titles_restore; row_count = 2;
   } else {
     titles = k_titles_back; row_count = 3;
   }
@@ -1207,7 +1308,7 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
 static void prv_ruck_prompt_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   s_ruck_prompt_selected_row = 0;
-  if (s_ruck_prompt_mode != RUCK_PROMPT_MODE_DOWN) {
+  if (s_ruck_prompt_mode != RUCK_PROMPT_MODE_DOWN && s_ruck_prompt_mode != RUCK_PROMPT_MODE_RESTORE) {
     s_ruck_prompt_mode = RUCK_PROMPT_MODE_BACK;
   }
   s_ruck_prompt_layer = layer_create(layer_get_bounds(window_layer));
@@ -1254,57 +1355,16 @@ static void prv_main_down_click_handler(ClickRecognizerRef recognizer, void *con
   }
 }
 
-static uint16_t prv_music_get_num_rows_callback(MenuLayer *menu_layer, uint16_t section_index, void *context) {
-  (void)menu_layer;
-  (void)section_index;
-  (void)context;
-  return 3;
-}
-
-static void prv_music_draw_row_callback(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *context) {
-  (void)context;
-  static const char *k_titles[] = { "Play / Pause", "Next Track", "Previous Track" };
-  int row = cell_index->row;
-  if (row < 0 || row > 2) {
-    return;
-  }
-  menu_cell_basic_draw(ctx, cell_layer, k_titles[row], NULL, NULL);
-}
-
-static void prv_music_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *context) {
-  (void)menu_layer;
-  (void)cell_index;
-  (void)context;
-  vibes_short_pulse();
-}
-
-static void prv_music_window_load(Window *window) {
-  Layer *window_layer = window_get_root_layer(window);
-  GRect bounds = layer_get_bounds(window_layer);
-  GRect menu_bounds = GRect(SCREEN_PADDING, SCREEN_PADDING,
-                            bounds.size.w - (2 * SCREEN_PADDING),
-                            bounds.size.h - (2 * SCREEN_PADDING));
-  s_music_menu_layer = menu_layer_create(menu_bounds);
-  menu_layer_set_click_config_onto_window(s_music_menu_layer, window);
-  menu_layer_set_callbacks(s_music_menu_layer, NULL, (MenuLayerCallbacks) {
-    .get_num_rows = prv_music_get_num_rows_callback,
-    .draw_row = prv_music_draw_row_callback,
-    .select_click = prv_music_select_callback,
-  });
-  layer_add_child(window_layer, menu_layer_get_layer(s_music_menu_layer));
-}
-
-static void prv_music_window_unload(Window *window) {
-  (void)window;
-  menu_layer_destroy(s_music_menu_layer);
-  s_music_menu_layer = NULL;
-}
 
 static void prv_status_timer_callback(void *context) {
   (void)context;
   s_status_timer = NULL;
   if (window_stack_contains_window(s_status_window)) {
     window_stack_remove(s_status_window, true);
+  }
+  if (s_post_save_stay) {
+    s_post_save_stay = false;
+    return;
   }
   window_stack_pop_all(true);
 }
@@ -1365,16 +1425,30 @@ static void prv_status_window_unload(Window *window) {
   s_status_layer = NULL;
 }
 
+
 static void prv_main_up_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
-  window_stack_push(s_music_window, true);
+  if (!s_session_active) return;
+  time_t now = time(NULL);
+  if (s_session_paused) {
+    s_pause_total_s += (int32_t)(now - s_pause_start_time);
+    s_steps_baseline = prv_current_step_count(now) - s_steps_at_pause;
+    s_last_time = 0;
+    s_session_paused = false;
+  } else {
+    s_pause_start_time = now;
+    s_steps_at_pause = prv_current_step_count(now) - s_steps_baseline;
+    if (s_steps_at_pause < 0) s_steps_at_pause = 0;
+    s_session_paused = true;
+  }
+  prv_update_display();
 }
 
 static void prv_main_click_config_provider(void *context) {
   (void)context;
-  window_single_click_subscribe(BUTTON_ID_BACK, prv_main_back_click_handler);
   window_single_click_subscribe(BUTTON_ID_UP, prv_main_up_click_handler);
+  window_single_click_subscribe(BUTTON_ID_BACK, prv_main_back_click_handler);
   window_single_click_subscribe(BUTTON_ID_DOWN, prv_main_down_click_handler);
 }
 
@@ -1506,6 +1580,12 @@ static void prv_window_load(Window *window) {
   layer_add_child(window_layer, bitmap_layer_get_layer(s_bottom_right_icon_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_bottom_right_value_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_bottom_right_secondary_layer));
+
+  // Blue pause icon — full-width layer centred over the bottom three rows; hidden until paused
+  s_paused_icon_layer = layer_create(GRect(x0, y0 + 55, w, 110));
+  layer_set_update_proc(s_paused_icon_layer, prv_paused_icon_layer_update_proc);
+  layer_set_hidden(s_paused_icon_layer, true);
+  layer_add_child(window_layer, s_paused_icon_layer);
 }
 
 static void prv_window_unload(Window *window) {
@@ -1531,6 +1611,8 @@ static void prv_window_unload(Window *window) {
   gbitmap_destroy(s_timer_icon);
   gbitmap_destroy(s_steps_icon);
   gbitmap_destroy(s_fire_icon);
+  layer_destroy(s_paused_icon_layer);
+  s_paused_icon_layer = NULL;
 }
 
 static void prv_init(void) {
@@ -1591,12 +1673,6 @@ static void prv_init(void) {
     .unload = prv_profile_window_unload,
   });
 
-  s_music_window = window_create();
-  window_set_window_handlers(s_music_window, (WindowHandlers) {
-    .load = prv_music_window_load,
-    .unload = prv_music_window_unload,
-  });
-
   s_ruck_prompt_window = window_create();
   window_set_window_handlers(s_ruck_prompt_window, (WindowHandlers) {
     .load = prv_ruck_prompt_window_load,
@@ -1611,8 +1687,7 @@ static void prv_init(void) {
   });
 
   time_t now = time(NULL);
-  s_start_time = now;  // will be overwritten by prv_load_in_progress_session or prv_start_session
-  prv_load_in_progress_session();
+  s_start_time = now;
   struct tm *start_tm = localtime(&now);
   if (start_tm) {
     start_tm->tm_hour = 0;
@@ -1637,7 +1712,11 @@ static void prv_init(void) {
 }
 
 static void prv_deinit(void) {
-  prv_commit_session_totals("deinit");
+  if (s_session_active) {
+    prv_save_in_progress_session();
+  } else {
+    prv_commit_session_totals("deinit");
+  }
   tick_timer_service_unsubscribe();
   if (s_health_subscribed) {
     health_service_events_unsubscribe();
@@ -1648,7 +1727,6 @@ static void prv_deinit(void) {
     s_status_timer = NULL;
   }
   window_destroy(s_status_window);
-  window_destroy(s_music_window);
   window_destroy(s_ruck_prompt_window);
   window_destroy(s_profile_window);
   window_destroy(s_window);

@@ -54,7 +54,7 @@
 
 ## Footer
 - title: How to use
-- subtitle: ↑ Music
+- subtitle: ↑ Pauses the current ruck
             ↓ Saves the current ruck session and creates a timeline pin
             ← Discard current ruck session and return to profile screen
 

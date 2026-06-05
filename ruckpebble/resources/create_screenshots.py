@@ -440,6 +440,11 @@ def main():
             screenshot = Path(args.settings_screenshot) if args.settings_screenshot else None
         else:
             continue
+        if screenshot is None or not screenshot.exists():
+            import sys
+            print(f"Skipping '{doc['title']}': screenshot not found at {screenshot}", file=sys.stderr)
+            print(f"  Capture it with: pebble screenshot --emulator emery {screenshot}", file=sys.stderr)
+            continue
         output = Path(args.output_dir) / output_name_for_doc(doc)
         outputs.append(render_screen(doc, screenshot, output))
 
