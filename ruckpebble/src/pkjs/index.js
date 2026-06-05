@@ -492,7 +492,9 @@
       '</script>' +
       '</body></html>';
 
-    Pebble.openURL('data:text/html,' + encodeURIComponent(html));
+    // base64 encoding works reliably across both WebKit (Safari) and Chromium (Brave/Chrome).
+    // The unescape(encodeURIComponent()) step makes btoa() safe for any Unicode characters.
+    Pebble.openURL('data:text/html;charset=utf-8;base64,' + btoa(unescape(encodeURIComponent(html))));
   }
 
   Pebble.addEventListener('showConfiguration', function() {

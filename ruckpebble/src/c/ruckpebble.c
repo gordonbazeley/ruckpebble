@@ -178,7 +178,7 @@ static int32_t prv_active_profile_index(void) {
 }
 
 static void prv_status_timer_callback(void *context);
-static void prv_ruck_prompt_pebble_menu(void);
+
 static void prv_show_status_message(const char *text, uint32_t duration_ms);
 static void prv_health_handler(HealthEventType event, void *context);
 static void prv_reset_session_state(void);
@@ -396,8 +396,6 @@ static void prv_set_text_style(TextLayer *layer, GFont font, GTextAlignment alig
 static void prv_grid_layer_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   int w = bounds.size.w;
-  int h = bounds.size.h;
-
   int y_top = 60;
   int y_bottom = 136;
 
@@ -1150,13 +1148,6 @@ static void prv_ruck_prompt_resume(void) {
   }
 }
 
-static void prv_ruck_prompt_pebble_menu(void) {
-  prv_save_in_progress_session();
-  if (window_stack_contains_window(s_ruck_prompt_window)) {
-    window_stack_remove(s_ruck_prompt_window, true);
-  }
-  window_stack_pop_all(true);
-}
 
 static void prv_ruck_prompt_save(void) {
   s_session_active = false;

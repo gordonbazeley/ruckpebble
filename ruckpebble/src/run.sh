@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/.."
 
 unset PYTHONPATH
 unset PYTHONHOME
@@ -51,15 +52,5 @@ if ! install_with_timeout 45; then
   install_with_timeout 60
 fi
 
-pebble emu-app-config --emulator emery &
-config_pid=$!
-for _ in {1..10}; do
-  if ! kill -0 "$config_pid" 2>/dev/null; then
-    wait "$config_pid"
-    exit $?
-  fi
-  sleep 1
-done
-
-echo "App installed. Config browser did not finish opening; leaving emulator running."
-kill "$config_pid" 2>/dev/null || true
+echo "App installed. Opening config in Brave..."
+node "$SCRIPT_DIR/open_config.js" &
