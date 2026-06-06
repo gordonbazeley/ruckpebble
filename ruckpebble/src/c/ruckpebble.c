@@ -55,6 +55,7 @@ enum {
   SESSION_RESUME_CALORIES_PERSIST_KEY  = 13,
   SESSION_RESUME_ELAPSED_S_PERSIST_KEY = 14,
   SESSION_RESUME_PROFILE_PERSIST_KEY   = 15,
+  SESSION_RESUME_STEPS_PERSIST_KEY     = 16,
 };
 
 #define APP_STATE_SCHEMA_VERSION 2
@@ -140,6 +141,8 @@ static int64_t s_speed_mmps = 0;
 static int32_t s_session_distance_m = 0;
 static int32_t s_session_calories = 0;
 static int32_t s_session_distance_offset_m = 0;
+static int32_t s_session_steps = 0;
+static int32_t s_session_steps_offset = 0;
 static bool s_session_paused = false;
 static time_t s_pause_start_time = 0;
 static int32_t s_pause_total_s = 0;
@@ -209,7 +212,10 @@ static int32_t prv_current_step_count(time_t now) {
     return 0;
   }
 
-  HealthValue steps = health_service_sum_today(HealthMetricStepCount);
+  HealthValue steps = health_service_peek_current_value(HealthMetricStepCount);
+  if (steps <= 0) {
+    steps = health_service_sum_today(HealthMetricStepCount);
+  }
   if (steps < 0) {
     return 0;
   }
@@ -439,6 +445,7 @@ static void prv_save_in_progress_session(void) {
   persist_write_int(SESSION_RESUME_ELAPSED_S_PERSIST_KEY, elapsed_s);
   persist_write_int(SESSION_RESUME_DISTANCE_M_PERSIST_KEY, s_session_distance_m);
   persist_write_int(SESSION_RESUME_CALORIES_PERSIST_KEY, s_session_calories);
+  persist_write_int(SESSION_RESUME_STEPS_PERSIST_KEY, s_session_steps);
   persist_write_int(SESSION_RESUME_PROFILE_PERSIST_KEY, (int32_t)s_settings.active_profile);
 }
 
@@ -470,6 +477,12 @@ static void prv_resume_in_progress_session(void) {
   s_session_distance_offset_m = persist_exists(SESSION_RESUME_DISTANCE_M_PERSIST_KEY) ?
       persist_read_int(SESSION_RESUME_DISTANCE_M_PERSIST_KEY) : 0;
   s_session_distance_m = s_session_distance_offset_m;
+  s_session_steps_offset = persist_exists(SESSION_RESUME_STEPS_PERSIST_KEY) ?
+      persist_read_int(SESSION_RESUME_STEPS_PERSIST_KEY) : 0;
+  if (s_session_steps_offset < 0) {
+    s_session_steps_offset = 0;
+  }
+  s_session_steps = s_session_steps_offset;
 
   s_start_time = now - (time_t)saved_elapsed_s;
   s_session_active = true;
@@ -477,8 +490,8 @@ static void prv_resume_in_progress_session(void) {
   prv_ensure_health_subscription(now);
   s_steps_baseline = s_health_available ? prv_current_step_count(now) : 0;
 
-  APP_LOG(APP_LOG_LEVEL_INFO, "Resumed session: elapsed=%lds dist_offset=%ldm",
-          (long)saved_elapsed_s, (long)s_session_distance_offset_m);
+  APP_LOG(APP_LOG_LEVEL_INFO, "Resumed session: elapsed=%lds dist_offset=%ldm steps_offset=%ld",
+          (long)saved_elapsed_s, (long)s_session_distance_offset_m, (long)s_session_steps_offset);
 }
 
 static void prv_load_settings(void) {
@@ -589,7 +602,7 @@ static void prv_paused_icon_layer_update_proc(Layer *layer, GContext *ctx) {
   int16_t left_x = (bounds.size.w - total_w) / 2;
   int16_t right_x = left_x + bar_w + gap;
   int16_t top_y = (bounds.size.h - bar_h) / 2;
-  graphics_context_set_fill_color(ctx, GColorVividCerulean);
+  graphics_context_set_fill_color(ctx, GColorCobaltBlue);
   graphics_fill_rect(ctx, GRect(left_x, top_y, bar_w, bar_h), 4, GCornersAll);
   graphics_fill_rect(ctx, GRect(right_x, top_y, bar_w, bar_h), 4, GCornersAll);
 }
@@ -612,24 +625,30 @@ static void prv_update_display(void) {
     elapsed_s *= EMULATOR_TIME_SCALE;
   }
 
-  int32_t steps = 0;
+  int32_t steps = s_session_steps_offset;
   int32_t steps_total_day = 0;
   steps_total_day = prv_current_step_count(now);
 #if LOG_HEALTH_STEP_CADENCE
   prv_log_health_step_cadence(now, steps_total_day);
 #endif
   if (s_health_available) {
-    steps = steps_total_day - s_steps_baseline;
-    if (steps < 0) {
-      steps = 0;
+    int32_t steps_since_baseline = steps_total_day - s_steps_baseline;
+    if (steps_since_baseline < 0) {
+      steps_since_baseline = 0;
     }
+    steps = s_session_steps_offset + steps_since_baseline;
   }
   if (s_session_paused && steps > s_steps_at_pause) {
     steps = s_steps_at_pause;
   }
+  s_session_steps = steps;
 
   int64_t stride_mm = prv_stride_to_mm(s_settings.stride_value, s_settings.stride_unit);
-  int64_t distance_mm = (int64_t)steps * stride_mm;
+  int32_t steps_since_offset = steps - s_session_steps_offset;
+  if (steps_since_offset < 0) {
+    steps_since_offset = 0;
+  }
+  int64_t distance_mm = (int64_t)steps_since_offset * stride_mm;
   int64_t total_distance_mm = distance_mm + (int64_t)s_session_distance_offset_m * 1000;
   if (s_last_time == 0) {
     s_last_time = now;
@@ -984,6 +1003,8 @@ static void prv_reset_session_state(void) {
   s_session_pace_sec = 0;
   s_current_pace_sec = 0;
   s_session_distance_offset_m = 0;
+  s_session_steps = 0;
+  s_session_steps_offset = 0;
   s_session_paused = false;
   s_pause_start_time = 0;
   s_pause_total_s = 0;
@@ -1449,13 +1470,20 @@ static void prv_main_up_click_handler(ClickRecognizerRef recognizer, void *conte
   time_t now = time(NULL);
   if (s_session_paused) {
     s_pause_total_s += (int32_t)(now - s_pause_start_time);
-    s_steps_baseline = prv_current_step_count(now) - s_steps_at_pause;
+    int32_t steps_since_baseline_at_pause = s_steps_at_pause - s_session_steps_offset;
+    if (steps_since_baseline_at_pause < 0) {
+      steps_since_baseline_at_pause = 0;
+    }
+    s_steps_baseline = prv_current_step_count(now) - steps_since_baseline_at_pause;
     s_last_time = 0;
     s_session_paused = false;
   } else {
     s_pause_start_time = now;
-    s_steps_at_pause = prv_current_step_count(now) - s_steps_baseline;
-    if (s_steps_at_pause < 0) s_steps_at_pause = 0;
+    int32_t steps_since_baseline = prv_current_step_count(now) - s_steps_baseline;
+    if (steps_since_baseline < 0) {
+      steps_since_baseline = 0;
+    }
+    s_steps_at_pause = s_session_steps_offset + steps_since_baseline;
     s_session_paused = true;
   }
   prv_update_display();
