@@ -8,19 +8,26 @@ var fs = require('fs');
 var path = require('path');
 var child_process = require('child_process');
 
-// Build name→numeric-index map from package.json messageKeys (pebble send-app-message requires numeric keys)
+// Build name→numeric-key map from package.json messageKeys (pebble send-app-message requires numeric keys).
+// Pebble SDK 3 assigns app message keys from 10000 upward in package.json order.
 var pkg = require(path.resolve(__dirname, '..', 'package.json'));
 var MSG_KEY_INDEX = {};
-(pkg.pebble.messageKeys || []).forEach(function(name, idx) { MSG_KEY_INDEX[name] = idx; });
+(pkg.pebble.messageKeys || []).forEach(function(name, idx) { MSG_KEY_INDEX[name] = 10000 + idx; });
 
 var SETTINGS_KEY = 'ruck_settings_v2';
 var APP_UUID = 'e078ce1c-3c93-459f-aa3c-b5390977c663';
+var HELPER_STORAGE_FILE = path.resolve(__dirname, '..', '.open_config_localStorage.json');
+var storageIsEmulator = false;
 
 function findLocalStorageFile() {
   var candidates = [
     path.join(process.env.HOME, '.pebble-dev', APP_UUID, 'localStorage.json'),
     path.join(process.env.HOME, '.pebble-dev', 'pypkjs_localStorage.json'),
     path.join(process.env.HOME, 'Library', 'Application Support', 'Pebble SDK', '4.9.169', 'emery', 'localStorage.json'),
+    path.join(process.env.HOME, 'Library', 'Application Support', 'Pebble SDK', '4.9.169', 'emery', 'localstorage', APP_UUID + '.dat'),
+    path.join(process.env.HOME, 'Library', 'Application Support', 'Pebble SDK', '4.9.148', 'emery', 'localstorage', APP_UUID + '.dat'),
+    path.join(process.env.HOME, 'Library', 'Application Support', 'Pebble SDK', '4.9.77', 'emery', 'localstorage', APP_UUID + '.dat'),
+    HELPER_STORAGE_FILE,
   ];
   for (var i = 0; i < candidates.length; i++) {
     if (fs.existsSync(candidates[i])) return candidates[i];
@@ -35,18 +42,58 @@ function findLocalStorageFile() {
   return null;
 }
 
+function readPypkjsLocalStorage(datFile) {
+  var dirFile = datFile.replace(/\.dat$/, '.dir');
+  var out = {};
+  if (!fs.existsSync(datFile) || !fs.existsSync(dirFile)) {
+    return out;
+  }
+  var dat = fs.readFileSync(datFile);
+  var dir = fs.readFileSync(dirFile, 'utf8').split(/\r?\n/);
+  dir.forEach(function(line) {
+    var m = line.match(/^'([^']+)', \((\d+), (\d+)\)$/);
+    if (!m) return;
+    var key = m[1];
+    var offset = parseInt(m[2], 10);
+    var length = parseInt(m[3], 10);
+    out[key] = dat.slice(offset, offset + length).toString('utf8');
+  });
+  return out;
+}
+
+function writePypkjsLocalStorage(datFile, data) {
+  var dirFile = datFile.replace(/\.dat$/, '.dir');
+  var bakFile = datFile.replace(/\.dat$/, '.bak');
+  var keys = Object.keys(data).sort();
+  var offset = 0;
+  var chunks = [];
+  var dirLines = [];
+  keys.forEach(function(key) {
+    var value = Buffer.from(String(data[key]), 'utf8');
+    chunks.push(value);
+    dirLines.push("'" + key.replace(/'/g, "\\'") + "', (" + offset + ', ' + value.length + ')');
+    offset += value.length;
+  });
+  var dirText = dirLines.join('\n') + (dirLines.length ? '\n' : '');
+  fs.writeFileSync(datFile, Buffer.concat(chunks));
+  fs.writeFileSync(dirFile, dirText);
+  fs.writeFileSync(bakFile, dirText);
+}
+
 // ---- Mock Pebble / browser environment ----
 var storageData = {};
 var lsFile = findLocalStorageFile();
 if (lsFile) {
   try {
-    storageData = JSON.parse(fs.readFileSync(lsFile, 'utf8'));
+    storageData = /\.dat$/.test(lsFile) ? readPypkjsLocalStorage(lsFile) : JSON.parse(fs.readFileSync(lsFile, 'utf8'));
     console.log('Loaded settings from', lsFile);
+    storageIsEmulator = /Pebble SDK/.test(lsFile) || /\.dat$/.test(lsFile);
   } catch (e) {
     console.warn('Could not parse localStorage file:', e.message);
   }
 } else {
-  console.warn('pypkjs localStorage not found — using default settings');
+  lsFile = HELPER_STORAGE_FILE;
+  console.warn('localStorage not found — using default settings');
 }
 
 global.localStorage = {
@@ -117,7 +164,11 @@ if (capturedUrl.indexOf('base64,') !== -1) {
 function persistSettings() {
   if (!lsFile) return;
   try {
-    fs.writeFileSync(lsFile, JSON.stringify(storageData, null, 2));
+    if (/\.dat$/.test(lsFile)) {
+      writePypkjsLocalStorage(lsFile, storageData);
+    } else {
+      fs.writeFileSync(lsFile, JSON.stringify(storageData, null, 2));
+    }
     console.log('Settings persisted to', lsFile);
   } catch (e) {
     console.warn('Could not write localStorage file:', e.message);
@@ -144,7 +195,12 @@ function syncToWatch(watchMsg) {
       intPairs.push(idx + '=' + val);
     }
   }
-  var args = ['send-app-message', '--emulator', 'emery'];
+  var args = ['send-app-message'];
+  if (storageIsEmulator) {
+    args = args.concat(['--emulator', 'emery']);
+  } else {
+    args = args.concat(['--phone']);
+  }
   if (intPairs.length) args = args.concat(['--int'], intPairs);
   if (strPairs.length) args = args.concat(['--string'], strPairs);
   try {
@@ -189,6 +245,10 @@ var server = http.createServer(function(req, res) {
     // sendAppMessageLog[0] is the settings message from syncSettingsToWatch
     var watchMsg = sendAppMessageLog[0];
     if (watchMsg) syncToWatch(watchMsg);
+    var savedSnapshot = {};
+    try {
+      savedSnapshot = JSON.parse(storageData[SETTINGS_KEY] || '{}');
+    } catch (e) {}
 
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end([
@@ -205,9 +265,15 @@ var server = http.createServer(function(req, res) {
     return;
   }
 
-  // Serve config HTML for all other paths — the page reads ?return_to from location.search
+  // Serve config HTML for all other paths. The embedded page reads ?return_to
+  // from location.search, so add it defensively for refreshes or bare server URLs.
+  var fallbackReturnTo = encodeURIComponent('http://' + req.headers.host + '/save?data=');
+  var servedHtml = html.replace(
+    '</head>',
+    '<script>if(location.search.indexOf("return_to=")===-1){history.replaceState(null,"",location.pathname+"?return_to=' + fallbackReturnTo + '"+location.hash);}</script></head>'
+  );
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  res.end(html);
+  res.end(servedHtml);
 });
 
 server.listen(0, '127.0.0.1', function() {

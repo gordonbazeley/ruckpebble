@@ -1,0 +1,4 @@
+{
+  "ruck_settings_v2": "{\"weight_value\":800,\"weight_unit\":0,\"ruck_weight_unit\":1,\"stride_length_value\":780,\"stride_length_unit\":0,\"profile1_ruck_weight_value\":300,\"profile1_terrain_factor\":100,\"profile1_terrain_type\":\"road\",\"profile1_grade_percent\":0,\"profile1_name\":\"30lb, road\",\"profile2_ruck_weight_value\":300,\"profile2_terrain_factor\":100,\"profile2_terrain_type\":\"road\",\"profile2_grade_percent\":0,\"profile2_name\":\"30lb, hilly\",\"profile3_ruck_weight_value\":150,\"profile3_terrain_factor\":100,\"profile3_terrain_type\":\"road\",\"profile3_grade_percent\":0,\"profile3_name\":\"15lb, road\",\"lifetime_distance_m_total\":0,\"lifetime_calories_total\":8,\"last_activity_distance_m\":0,\"last_activity_calories\":0,\"last_activity_pace_sec\":0,\"last_activity_duration_sec\":0,\"last_activity_timestamp\":0}",
+  "ruck_debug_timeline_pin_v1": ""
+}

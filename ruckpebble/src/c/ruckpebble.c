@@ -595,16 +595,16 @@ static void prv_commit_session_totals(const char *reason) {
 
 static void prv_paused_icon_layer_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-  const int16_t bar_w = 14;
-  const int16_t bar_h = 44;
-  const int16_t gap = 12;
+  const int16_t bar_w = 28;
+  const int16_t bar_h = 88;
+  const int16_t gap = 24;
   const int16_t total_w = bar_w * 2 + gap;
   int16_t left_x = (bounds.size.w - total_w) / 2;
   int16_t right_x = left_x + bar_w + gap;
   int16_t top_y = (bounds.size.h - bar_h) / 2;
-  graphics_context_set_fill_color(ctx, GColorCobaltBlue);
-  graphics_fill_rect(ctx, GRect(left_x, top_y, bar_w, bar_h), 4, GCornersAll);
-  graphics_fill_rect(ctx, GRect(right_x, top_y, bar_w, bar_h), 4, GCornersAll);
+  graphics_context_set_fill_color(ctx, GColorBlueMoon);
+  graphics_fill_rect(ctx, GRect(left_x, top_y, bar_w, bar_h), 8, GCornersAll);
+  graphics_fill_rect(ctx, GRect(right_x, top_y, bar_w, bar_h), 8, GCornersAll);
 }
 
 static void prv_update_display(void) {
@@ -786,10 +786,6 @@ static void prv_update_display(void) {
   }
   snprintf(distance_buf, sizeof(distance_buf), "%lld.%02lld%s",
            (long long)(distance_x100 / 100), (long long)llabs(distance_x100 % 100), distance_unit_label);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "sim=%ld health=%d baseline=%ld steps=%ld total=%ld elapsed_real=%ld elapsed_s=%ld",
-          (long)s_settings.sim_steps_enabled, (int)s_health_available,
-          (long)s_steps_baseline, (long)steps, (long)steps_total_day,
-          (long)elapsed_real_s, (long)elapsed_s);
   snprintf(timer_value_buf, sizeof(timer_value_buf), "%ld:%02ld",
            (long)(elapsed_s / 60), (long)(elapsed_s % 60));
   snprintf(steps_value_buf, sizeof(steps_value_buf), "%ld", (long)steps);
@@ -890,6 +886,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   t = dict_find(iter, MESSAGE_KEY_profile1_grade_percent);
   if (t) {
     s_settings.profiles[0].grade_percent = t->value->int32;
+    APP_LOG(APP_LOG_LEVEL_INFO, "profile1_grade_percent set to %ld", (long)s_settings.profiles[0].grade_percent);
   }
   t = dict_find(iter, MESSAGE_KEY_profile2_ruck_weight_value);
   if (t) {
@@ -902,6 +899,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   t = dict_find(iter, MESSAGE_KEY_profile2_grade_percent);
   if (t) {
     s_settings.profiles[1].grade_percent = t->value->int32;
+    APP_LOG(APP_LOG_LEVEL_INFO, "profile2_grade_percent set to %ld", (long)s_settings.profiles[1].grade_percent);
   }
   t = dict_find(iter, MESSAGE_KEY_profile3_ruck_weight_value);
   if (t) {
@@ -926,6 +924,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   t = dict_find(iter, MESSAGE_KEY_profile3_grade_percent);
   if (t) {
     s_settings.profiles[2].grade_percent = t->value->int32;
+    APP_LOG(APP_LOG_LEVEL_INFO, "profile3_grade_percent set to %ld", (long)s_settings.profiles[2].grade_percent);
   }
   t = dict_find(iter, MESSAGE_KEY_profile1_name);
   if (t && t->type == TUPLE_CSTRING) {
@@ -959,7 +958,11 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   }
 
   prv_save_settings();
-  APP_LOG(APP_LOG_LEVEL_INFO, "Config applied: active_profile=%ld", (long)s_settings.active_profile);
+  APP_LOG(APP_LOG_LEVEL_INFO, "Config applied: active_profile=%ld grades=%ld,%ld,%ld",
+          (long)s_settings.active_profile,
+          (long)s_settings.profiles[0].grade_percent,
+          (long)s_settings.profiles[1].grade_percent,
+          (long)s_settings.profiles[2].grade_percent);
   if (s_profile_menu_layer) {
     menu_layer_reload_data(s_profile_menu_layer);
   }
