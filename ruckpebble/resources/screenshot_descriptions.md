@@ -71,6 +71,7 @@
 ## Profile 1
 - description: Sets the name, ruck weight, terrain, and grade used when this profile is selected on the watch.
                * Ruck weight - The more weight you carry the more calories you burn.
+                 * NB. We use lb for all ruck weights since ruck plates are commonly sold in lb rather than kg.
                * Terrain - The trickier the terrain the more calories you burn.
                * Grade - The steeper the terrain the more calories you burn. 
                  * But … on a ruck you won't be going up a constant grade. 

@@ -63,26 +63,26 @@ enum {
 static const Settings SETTINGS_DEFAULTS = {
   .weight_value = 800,
   .weight_unit = 0,
-  .ruck_weight_unit = 1,
+  .ruck_weight_unit = 0,
   .stride_value = 780,
   .stride_unit = 0,
   .sim_steps_enabled = 0,
   .sim_steps_spm = 122,
   .active_profile = 0,
   .profiles = {
-    { .ruck_weight_value = 300, .terrain_factor = 100, .grade_percent = 0 },
-    { .ruck_weight_value = 300, .terrain_factor = 100, .grade_percent = 0 },
-    { .ruck_weight_value = 150, .terrain_factor = 100, .grade_percent = 0 }
+    { .ruck_weight_value = 136, .terrain_factor = 100, .grade_percent = 0 },
+    { .ruck_weight_value = 68, .terrain_factor = 100, .grade_percent = 0 },
+    { .ruck_weight_value = 136, .terrain_factor = 120, .grade_percent = 20 }
   },
   .profile_names = {
     "30lb, road",
-    "30lb, hilly",
-    "15lb, road"
+    "15lb, road",
+    "30lb, trail"
   },
   .profile_terrain_types = {
     "road",
     "road",
-    "road"
+    "gravel"
   }
 };
 
@@ -167,18 +167,29 @@ static time_t s_step_history_time[PACE_HISTORY_SECONDS];
 
 #define EMULATOR_TIME_SCALE 10
 
-static int64_t prv_weight_to_kg1000(int32_t value_tenths, int32_t unit) {
-  if (unit == 1) {
-    return ((int64_t)value_tenths * 453592) / 10000;
-  }
+static int64_t prv_weight_to_kg1000(int32_t value_tenths) {
   return (int64_t)value_tenths * 100;
 }
 
-static int64_t prv_stride_to_mm(int32_t value_tenths, int32_t unit) {
-  if (unit == 1) {
-    return ((int64_t)value_tenths * 254) / 10;
-  }
+static int64_t prv_stride_to_mm(int32_t value_tenths) {
   return (int64_t)value_tenths;
+}
+
+static int32_t prv_lb_tenths_to_kg_tenths(int32_t value_tenths) {
+  return (int32_t)(((int64_t)value_tenths * 453592 + 500000) / 1000000);
+}
+
+static int32_t prv_kg_tenths_to_lb_tenths(int32_t value_tenths) {
+  return (int32_t)(((int64_t)value_tenths * 1000000 + 226796) / 453592);
+}
+
+static int32_t prv_in_tenths_to_cm_tenths(int32_t value_tenths) {
+  return (int32_t)(((int64_t)value_tenths * 254 + 50) / 100);
+}
+
+static bool prv_use_imperial_distance_units(void) {
+  MeasurementSystem system = health_service_get_measurement_system_for_display(HealthMetricWalkedDistanceMeters);
+  return system == MeasurementSystemImperial;
 }
 
 static int32_t prv_active_profile_index(void) {
@@ -502,6 +513,20 @@ static void prv_load_settings(void) {
   if (persist_exists(SETTINGS_PERSIST_KEY)) {
     persist_read_data(SETTINGS_PERSIST_KEY, &s_settings, sizeof(s_settings));
   }
+  if (s_settings.weight_unit == 1) {
+    s_settings.weight_value = prv_lb_tenths_to_kg_tenths(s_settings.weight_value);
+    s_settings.weight_unit = 0;
+  }
+  if (s_settings.ruck_weight_unit == 1) {
+    for (int i = 0; i < PROFILE_COUNT; ++i) {
+      s_settings.profiles[i].ruck_weight_value = prv_lb_tenths_to_kg_tenths(s_settings.profiles[i].ruck_weight_value);
+    }
+    s_settings.ruck_weight_unit = 0;
+  }
+  if (s_settings.stride_unit == 1) {
+    s_settings.stride_value = prv_in_tenths_to_cm_tenths(s_settings.stride_value);
+    s_settings.stride_unit = 0;
+  }
   s_settings.sim_steps_enabled = 0;
   for (int i = 0; i < PROFILE_COUNT; ++i) {
     s_settings.profiles[i].terrain_factor = prv_normalize_terrain_factor(s_settings.profiles[i].terrain_factor);
@@ -646,7 +671,7 @@ static void prv_update_display(void) {
   }
   s_session_steps = steps;
 
-  int64_t stride_mm = prv_stride_to_mm(s_settings.stride_value, s_settings.stride_unit);
+  int64_t stride_mm = prv_stride_to_mm(s_settings.stride_value);
   int32_t steps_since_offset = steps - s_session_steps_offset;
   if (steps_since_offset < 0) {
     steps_since_offset = 0;
@@ -677,7 +702,7 @@ static void prv_update_display(void) {
     speed_mmps = 5000;
   }
 
-  bool use_imperial = (s_settings.weight_unit == 1);
+  bool use_imperial = prv_use_imperial_distance_units();
   int64_t unit_mm = use_imperial ? 1609344 : 1000000;
   const char *distance_unit_label = use_imperial ? "mi" : "km";
   int64_t distance_x100 = (total_distance_mm * 100) / unit_mm;
@@ -728,8 +753,8 @@ static void prv_update_display(void) {
   }
 
   ProfileSettings *profile = prv_active_profile();
-  int64_t weight_kg1000 = prv_weight_to_kg1000(s_settings.weight_value, s_settings.weight_unit);
-  int64_t load_kg1000 = prv_weight_to_kg1000(profile->ruck_weight_value, s_settings.ruck_weight_unit);
+  int64_t weight_kg1000 = prv_weight_to_kg1000(s_settings.weight_value);
+  int64_t load_kg1000 = prv_weight_to_kg1000(profile->ruck_weight_value);
   int64_t session_speed_mmps = 0;
   if (elapsed_s > 0 && total_distance_mm > 0) {
     session_speed_mmps = total_distance_mm / elapsed_s;
@@ -864,11 +889,19 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   }
   t = dict_find(iter, MESSAGE_KEY_weight_unit);
   if (t) {
-    s_settings.weight_unit = t->value->int32;
+    if (t->value->int32 == 1) {
+      s_settings.weight_value = prv_lb_tenths_to_kg_tenths(s_settings.weight_value);
+    }
+    s_settings.weight_unit = 0;
   }
   t = dict_find(iter, MESSAGE_KEY_ruck_weight_unit);
   if (t) {
-    s_settings.ruck_weight_unit = t->value->int32;
+    if (t->value->int32 == 1) {
+      for (int i = 0; i < PROFILE_COUNT; ++i) {
+        s_settings.profiles[i].ruck_weight_value = prv_lb_tenths_to_kg_tenths(s_settings.profiles[i].ruck_weight_value);
+      }
+    }
+    s_settings.ruck_weight_unit = 0;
   }
   t = dict_find(iter, MESSAGE_KEY_stride_length_value);
   if (t) {
@@ -876,7 +909,10 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   }
   t = dict_find(iter, MESSAGE_KEY_stride_length_unit);
   if (t) {
-    s_settings.stride_unit = t->value->int32;
+    if (t->value->int32 == 1) {
+      s_settings.stride_value = prv_in_tenths_to_cm_tenths(s_settings.stride_value);
+    }
+    s_settings.stride_unit = 0;
   }
   t = dict_find(iter, MESSAGE_KEY_profile1_ruck_weight_value);
   if (t) {
@@ -1045,7 +1081,7 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   static char terrain_value[12];
   static char grade_value[12];
   const char *title_text = legacy_title;
-  const char *weight_unit = (s_settings.ruck_weight_unit == 1) ? "lb" : "kg";
+  const char *weight_unit = "lb";
   const int16_t y = 0;
   GRect bounds = layer_get_bounds((Layer *)cell_layer);
   const int16_t row_w = bounds.size.w;
@@ -1074,8 +1110,9 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   GColor fg = is_highlighted ? GColorBlack : GColorWhite;
 
   title_text = prv_profile_display_name(row, legacy_title, sizeof(legacy_title));
+  int32_t weight_lb_tenths = prv_kg_tenths_to_lb_tenths(p->ruck_weight_value);
   snprintf(weight_value, sizeof(weight_value), "%ld.%ld%s",
-           (long)(p->ruck_weight_value / 10), (long)labs(p->ruck_weight_value % 10), weight_unit);
+           (long)(weight_lb_tenths / 10), (long)labs(weight_lb_tenths % 10), weight_unit);
   snprintf(terrain_value, sizeof(terrain_value), "%s", prv_profile_terrain_label(row, p->terrain_factor));
   int32_t grade_int = (p->grade_percent >= 0) ? ((p->grade_percent + 5) / 10) : ((p->grade_percent - 5) / 10);
   snprintf(grade_value, sizeof(grade_value), "%ld%%", (long)grade_int);
