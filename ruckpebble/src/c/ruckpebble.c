@@ -1382,8 +1382,8 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   static const char *k_titles_restore[] = { "Resume ruck", "Start new" };
   const char **titles;
   int row_count;
-  GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
-  int16_t row_h = 36;
+  GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
+  int16_t row_h = 40;
 
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_DOWN) {
     titles = k_titles_down; row_count = 3;
@@ -1409,7 +1409,7 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
       graphics_context_set_text_color(ctx, GColorWhite);
     }
     graphics_draw_text(ctx, titles[row], font,
-                       GRect(pad + 6, y + 4, row_w - 12, row_h - 8),
+                       GRect(pad + 6, y + 3, row_w - 12, row_h - 6),
                        GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
   }
 }
