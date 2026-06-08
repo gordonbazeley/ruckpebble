@@ -288,80 +288,125 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Ruck Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Stardos+Stencil:wght@700&display=swap" rel="stylesheet">
   <style>
-    body{margin:0;font:14px/1.35 Helvetica,Arial,sans-serif;background:#f3f4f6;color:#1f2430}
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{overflow-x:hidden;max-width:100%}
+    body{margin:0;font:13px/1.4 Helvetica,Arial,sans-serif;background:#f3f4f6;color:#1f2430}
     .app{min-height:100vh;display:flex;flex-direction:column}
-    .top{padding:18px 18px 8px}
-    .brand{display:flex;align-items:center;gap:12px;padding:12px 0 18px}
-    .badge{width:68px;height:68px;border-radius:18px;background:#4f8ed6;display:grid;place-items:center;flex:0 0 auto}
-    .badge svg{width:30px;height:30px;fill:#fff}
-    .title{font:700 34px/1 Georgia,serif;letter-spacing:-.02em}
+    .top,.tabs,.main{width:100%}
+    .top{padding:14px 14px 8px}
+    .brand{display:flex;align-items:center;gap:10px;padding:10px 0 14px}
+    .badge{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;flex:0 0 auto}
+    .badge svg{width:100%;height:100%}
+    .title{font:700 38px/1 'Stardos Stencil',Impact,'Arial Narrow Bold',sans-serif;letter-spacing:.04em}
     .tabs{display:flex;border-bottom:1px solid #dde1e7;background:rgba(255,255,255,.35)}
-    .tab-btn{appearance:none;border:0;background:none;flex:1;padding:16px 8px 14px;font:700 13px/1.1 Helvetica,Arial,sans-serif;letter-spacing:.12em;color:#7b818f}
+    .tab-btn{appearance:none;border:0;background:none;flex:1;padding:14px 8px 13px;font:700 12px/1.1 Helvetica,Arial,sans-serif;letter-spacing:.12em;color:#7b818f}
     .tab-btn.active{color:#4f8ed6}
     .tab-btn.active span{position:relative}
-    .tab-btn.active span:after{content:"";position:absolute;left:0;right:0;bottom:-16px;height:4px;border-radius:4px 4px 0 0;background:#4f8ed6}
-    .main{flex:1;padding:0 18px 90px}
-    .tab{display:none;padding-top:18px}
+    .tab-btn.active span:after{content:"";position:absolute;left:0;right:0;bottom:-15px;height:4px;border-radius:4px 4px 0 0;background:#4f8ed6}
+    .main{flex:1;padding:0 14px 88px}
+    .tab{display:none;padding-top:14px}
     .tab.active{display:block}
-    .section{display:flex;align-items:center;justify-content:space-between;margin:6px 2px 12px}
-    .section-title{font:800 22px/1.1 Helvetica,Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase}
-    .section-chip{font:700 12px/1 Helvetica,Arial,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#767d88}
-    .subhead{font:800 18px/1.1 Helvetica,Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#4f8ed6;display:flex;align-items:center;gap:8px;margin:12px 0 10px}
-    .subhead svg{width:18px;height:18px;fill:#4f8ed6}
-    .card{background:#fff;border:1px solid #dde1e7;border-radius:28px;padding:14px 14px 16px;box-shadow:0 1px 0 rgba(0,0,0,.03);margin-bottom:16px}
-    .field-label{display:block;font:800 13px/1.1 Helvetica,Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#727887;margin:12px 0 8px}
-    .row{display:flex;gap:14px}.row>*{flex:1}
+    .section{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 2px 10px}
+    .section-title{font:800 18px/1.1 Helvetica,Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase}
+    .section-chip{font:700 11px/1 Helvetica,Arial,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#767d88;flex:0 0 auto}
+    .subhead{font:800 16px/1.1 Helvetica,Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#4f8ed6;display:flex;align-items:center;gap:8px;margin:10px 0 8px}
+    .subhead svg{width:16px;height:16px;fill:#4f8ed6}
+    .card{background:#fff;border:1px solid #dde1e7;border-radius:22px;padding:12px 12px 14px;box-shadow:0 1px 0 rgba(0,0,0,.03);margin-bottom:14px}
+    .field-label{display:block;font:800 11px/1.1 Helvetica,Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#727887;margin:10px 0 7px}
+    .row{display:grid;grid-template-columns:1fr;gap:12px}
+    .row>*{min-width:0}
     input,select,button{font:inherit}
-    input,select{width:100%;height:64px;border:2px solid #e1e5eb;border-radius:18px;background:#fff;padding:0 18px;color:#252b39;outline:none}
-    input{font:700 30px/1.1 "Courier New",monospace;letter-spacing:-.03em}
-    select{font:700 26px/1.1 "Courier New",monospace}
-    .field-with-unit{position:relative}.field-with-unit .unit{position:absolute;right:16px;top:50%;transform:translateY(-50%);font:800 20px/1 Helvetica,Arial,sans-serif;letter-spacing:.08em;color:#6f7480;border-left:2px solid #e1e5eb;padding-left:14px;text-transform:uppercase}
-    .field-with-unit input{padding-right:88px}
-    .profiles{display:flex;flex-direction:column;gap:14px}
-    .profile{border-radius:24px;border:1px solid #dde1e7;background:#fff;padding:18px 16px 16px;box-shadow:0 1px 0 rgba(0,0,0,.03)}
+    input,select{width:100%;min-width:0;height:56px;border:2px solid #e1e5eb;border-radius:16px;background:#fff;padding:0 14px;color:#252b39;outline:none;box-sizing:border-box;font:700 17px/1.1 Helvetica,Arial,sans-serif}
+    .field-with-unit{display:flex;align-items:stretch;border:2px solid #e1e5eb;border-radius:16px;overflow:hidden;background:#fff}
+    .field-with-unit:focus-within{border-color:#4f8ed6}
+    .field-with-unit input,.field-with-unit select{flex:1;min-width:0;border:none;border-radius:0;background:transparent;padding:0 14px}
+    .field-with-unit .unit{display:flex;align-items:center;padding:0 14px 0 12px;border-left:2px solid #e1e5eb;font:800 14px/1 Helvetica,Arial,sans-serif;letter-spacing:.06em;color:#6f7480;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
+    .profiles{display:grid;grid-template-columns:1fr;gap:14px}
+    .profile{border-radius:20px;border:1px solid #dde1e7;background:#fff;padding:16px 14px 14px;box-shadow:0 1px 0 rgba(0,0,0,.03)}
     .profile-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .profile-name{display:flex;align-items:center;gap:12px;font:800 30px/1.1 Georgia,serif;letter-spacing:-.02em}
-    .swatch{width:22px;height:22px;border-radius:7px;flex:0 0 auto}
-    .edit-btn,.done-btn,.clear-btn,.save-btn{appearance:none;border:0;border-radius:18px;font:800 16px/1 Helvetica,Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase}
-    .edit-btn{width:54px;height:54px;background:#f3f6fb;border:2px solid #e2e6ed;color:#6b7280;display:grid;place-items:center;border-radius:14px}
-    .edit-btn svg{width:24px;height:24px;fill:none;stroke:#6b7280;stroke-width:2}
-    .summary-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:16px}
-    .summary-k{font:800 12px/1 Helvetica,Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#727887;display:flex;align-items:center;gap:6px}
-    .summary-v{font:700 24px/1.1 "Courier New",monospace;letter-spacing:-.03em}
-    .summary-v small,.kcal small,.history-v small{font:800 13px/1 Helvetica,Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#7a808b}
-    .editor{border:4px solid #4f8ed6;border-radius:28px;padding:16px 16px 18px;background:#fff;display:none;margin:0 0 16px}
-    .editor.active{display:block}
-    .editor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
-    .preview{background:#eaf2fb;color:#4f8ed6;border-radius:18px;padding:9px 14px;font:800 16px/1 Helvetica,Arial,sans-serif;white-space:nowrap}
-    .preview span{font:700 18px/1 "Courier New",monospace}
-    .editor-actions{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:10px}
-    .clear-btn{background:none;color:#74808f;padding:12px 0;display:flex;align-items:center;gap:8px;letter-spacing:.1em}
-    .clear-btn svg,.done-btn svg,.save-btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
-    .done-btn{background:#4f8ed6;color:#fff;padding:14px 22px;min-width:162px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:8px}
-    .save-bar{position:fixed;left:0;right:0;bottom:0;padding:12px 18px 14px;background:linear-gradient(to top, rgba(243,244,246,1) 76%, rgba(243,244,246,0));}
-    .save-btn{width:100%;height:72px;border-radius:22px;background:#4f8ed6;color:#fff;display:flex;align-items:center;justify-content:center;gap:10px;font-size:18px}
-    .chart-card{border:1px solid #dde1e7;border-radius:28px;background:#fff;padding:18px}
-    .pace-row{display:flex;justify-content:flex-end;margin-bottom:12px}
-    .pace-select{width:320px;max-width:100%;height:70px}
-    .legend-row{display:flex;align-items:center;gap:12px;margin:14px 0}
-    .legend-dot{width:18px;height:18px;border-radius:6px;flex:0 0 auto}
-    .legend-name{width:112px;font:800 18px/1.1 Helvetica,Arial,sans-serif}
-    .bar{flex:1;background:#edf0f5;border-radius:12px;height:34px;position:relative;overflow:hidden}
+    .profile-name{min-width:0;display:flex;align-items:center;gap:10px;font:800 20px/1.1 Helvetica,Arial,sans-serif;letter-spacing:-.01em}
+    .profile-name span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .swatch{width:18px;height:18px;border-radius:6px;flex:0 0 auto}
+    .edit-btn,.done-btn,.clear-btn,.save-btn{appearance:none;border:0;border-radius:16px;font:800 15px/1 Helvetica,Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase}
+    .edit-btn{width:48px;height:48px;background:#f3f6fb;border:2px solid #e2e6ed;color:#6b7280;display:grid;place-items:center;border-radius:14px;flex:0 0 auto}
+    .edit-btn svg{width:22px;height:22px;fill:none;stroke:#6b7280;stroke-width:2}
+    .summary-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}
+    .summary-k{font:800 11px/1 Helvetica,Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#727887;display:flex;align-items:center;gap:5px}
+    .summary-v{font:700 17px/1.1 Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums}
+    .summary-v small,.kcal small,.history-v small{font:800 11px/1 Helvetica,Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#7a808b}
+    .profile-kcal-badge{font:700 14px/1 Helvetica,Arial,sans-serif;color:#4f8ed6;background:#eaf2fb;border-radius:10px;padding:5px 9px;white-space:nowrap;flex-shrink:0}
+    .profile-kcal-badge small{font:700 11px/1 Helvetica,Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase}
+    .profile.editing{border-color:#4f8ed6;border-width:2px}
+    .profile.editing .edit-btn{display:none}
+    .inline-editor{display:none;padding-top:14px;border-top:1px solid #e8eaf0;margin-top:14px}
+    .inline-editor.open{display:block}
+    .editor-actions{display:flex;justify-content:flex-end;align-items:center;margin-top:14px;gap:10px}
+    .done-btn svg,.save-btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
+    .done-btn{background:#4f8ed6;color:#fff;padding:12px 20px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:7px;appearance:none;border:0;font:800 15px/1 Helvetica,Arial,sans-serif;letter-spacing:.1em;text-transform:uppercase}
+    .save-bar{position:fixed;left:0;right:0;bottom:0;padding:10px 14px 12px;background:linear-gradient(to top, rgba(243,244,246,1) 76%, rgba(243,244,246,0));}
+    .save-btn{width:100%;height:62px;border-radius:18px;background:#4f8ed6;color:#fff;display:flex;align-items:center;justify-content:center;gap:10px;font-size:16px;appearance:none;border:0;font:800 16px/1 Helvetica,Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+    .chart-card{border:1px solid #dde1e7;border-radius:22px;background:#fff;padding:14px}
+    .pace-row{margin-bottom:12px}
+    .legend-row{display:flex;align-items:center;gap:10px;margin:12px 0}
+    .legend-dot{width:16px;height:16px;border-radius:6px;flex:0 0 auto}
+    .legend-name{width:88px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:800 14px/1.1 Helvetica,Arial,sans-serif}
+    .bar{flex:1;background:#edf0f5;border-radius:12px;height:28px;position:relative;overflow:hidden}
     .fill{height:100%;border-radius:12px}
-    .kcal{width:92px;text-align:right;font:800 30px/1 "Courier New",monospace;letter-spacing:-.03em}
-    .history-card{border:1px solid #dde1e7;border-radius:28px;background:#fff;padding:18px 18px 8px;margin-bottom:16px}
-    .history-title{font:800 14px/1 Helvetica,Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#727887;margin-bottom:14px}
-    .history-row{display:flex;justify-content:space-between;align-items:baseline;padding:18px 2px;border-bottom:2px solid #e3e6ec}
+    .kcal{width:78px;text-align:right;font:800 19px/1 Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums}
+    .history-card{border:1px solid #dde1e7;border-radius:22px;background:#fff;padding:14px 14px 6px;margin-bottom:14px}
+    .history-title{font:800 12px/1 Helvetica,Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#727887;margin-bottom:10px}
+    .history-row{display:flex;justify-content:space-between;align-items:baseline;padding:14px 2px;border-bottom:2px solid #e3e6ec;gap:12px}
     .history-row:last-child{border-bottom:0}
-    .history-k{font-size:18px;color:#727887}
-    .history-v{font:800 28px/1 "Courier New",monospace;letter-spacing:-.03em}
+    .history-k{font-size:14px;color:#727887;min-width:0}
+    .history-v{font:800 18px/1 Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums;text-align:right;min-width:0}
+    @media (min-width: 560px){
+      .top{padding:18px 18px 10px}
+      .brand{gap:12px;padding:12px 0 18px}
+      .badge{width:64px;height:64px;border-radius:18px}
+      .title{font-size:44px}
+      .main{padding-left:18px;padding-right:18px}
+      .row{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .profile-name{font-size:22px}
+      .summary-v{font-size:19px}
+      .kcal{font-size:21px;width:86px}
+      .history-v{font-size:20px}
+      .legend-name{width:96px;font-size:15px}
+    }
+    @media (min-width: 900px){
+      .app{align-items:center}
+      .top,.tabs,.main{max-width:1120px}
+      .top,.main{padding-left:24px;padding-right:24px}
+      .top{padding-top:22px}
+      .brand{padding-bottom:22px}
+      .badge{width:72px;height:72px}
+      .title{font-size:52px}
+      .tab-btn{font-size:13px;padding-top:16px;padding-bottom:15px}
+      .tab-btn.active span:after{bottom:-16px}
+      .main{padding-bottom:104px}
+      .section-title{font-size:20px}
+      .subhead{font-size:18px}
+      .card,.profile,.editor,.chart-card,.history-card{border-radius:28px}
+      .profiles{gap:16px}
+      .profile{padding:18px 16px 16px}
+      .profile-name{font-size:24px}
+      .summary-grid{gap:10px}
+      .summary-v{font-size:20px}
+      .preview{font-size:16px}
+      .preview span{font-size:17px}
+      .save-bar{padding-left:24px;padding-right:24px}
+      .save-btn{height:70px;font-size:18px}
+      .history-k{font-size:16px}
+      .history-v{font-size:21px}
+    }
   </style>
 </head>
 <body>
   <div class="app">
     <div class="top">
-      <div class="brand"><div class="badge"><svg viewBox="0 0 16 16"><path d="M5 5h6l1 9H4l1-9zm1-3h4v2H6V2zm1 1v1h2V3H7z"/></svg></div><div class="title">RuckPebble</div></div>
+      <div class="brand"><div class="badge"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 144"><rect x="0" y="0" width="144" height="144" rx="26" fill="#11161a"/><rect x="34" y="18" width="76" height="108" rx="12" fill="none" stroke="#ecf1f4" stroke-width="4"/><path d="M55 18 Q72 4 89 18" fill="none" stroke="#ecf1f4" stroke-width="4" stroke-linecap="round"/><path d="M36 65 L108 51" fill="none" stroke="#ecf1f4" stroke-width="3" stroke-linecap="round"/><rect x="60" y="28" width="24" height="11" rx="2" fill="none" stroke="#ecf1f4" stroke-width="2"/></svg></div><div class="title">RuckPebble</div></div>
     </div>
     <div class="tabs">
       <button class="tab-btn active" data-tab="profiles"><span>PROFILES</span></button>
@@ -370,26 +415,18 @@
     </div>
     <div class="main">
       <section class="tab active" id="tab-profiles">
-        <div class="section"><div class="subhead"><svg viewBox="0 0 16 16"><path d="M8 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm-3 5h6v1H8v6H7V8H5z"/></svg>ABOUT YOU</div></div>
-        <div class="field-label">Units</div>
-        <select id="measurement_unit"><option value="0">Metric</option><option value="1">Imperial</option></select>
+        <div class="section"><div class="subhead"><svg viewBox="0 0 16 16"><circle cx="8" cy="3.5" r="2" fill="#4f8ed6"/><path d="M8 6v4.5M5.5 8l2.5-1.5 2.5 1.5M6 14l2-3.5M10 14l-2-3.5" stroke="#4f8ed6" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>ABOUT YOU</div></div>
+        <div class="row"><div><div class="field-label">Units</div><select id="measurement_unit"><option value="0">Metric</option><option value="1">Imperial</option></select></div><div></div></div>
         <div class="row">
-          <div><div class="field-label" id="body_weight_label_text">Body weight (kg)</div><div class="field-with-unit"><input id="weight_value" type="number" step="0.1"><div class="unit" id="body_weight_unit_suffix">kg</div></div></div>
-          <div><div class="field-label" id="stride_length_label_text">Stride length (cm)</div><div class="field-with-unit"><input id="stride_length_value" type="number" step="0.1"><div class="unit" id="stride_length_unit_suffix">cm</div></div></div>
+          <div><div class="field-label" id="body_weight_label_text">Body weight</div><div class="field-with-unit"><input id="weight_value" type="number" step="0.1"><div class="unit" id="body_weight_unit_suffix">kg</div></div></div>
+          <div><div class="field-label" id="stride_length_label_text">Stride length</div><div class="field-with-unit"><input id="stride_length_value" type="number" step="0.1"><div class="unit" id="stride_length_unit_suffix">cm</div></div></div>
         </div>
         <div class="section" style="margin-top:26px"><div class="subhead"><svg viewBox="0 0 16 16"><path d="M2 3h5l1 2h6v8H2zM3 4v7h10V6H7.4L6.4 4z"/></svg>PROFILES</div></div>
         <div id="profile_list" class="profiles"></div>
-        <div id="editor" class="editor">
-          <div class="editor-head"><div class="subhead" style="margin:0"><svg viewBox="0 0 16 16"><path d="M3 11V5l5-3 5 3v6l-5 3zM8 4.2 4.5 6.2V10l3.5 2 3.5-2V6.2z"/></svg><span id="editor_title">EDIT PROFILE</span></div><div class="preview">≈ <span id="editor_preview_kcal">0</span> kcal/h</div></div>
-          <div class="field-label">Profile name</div><input id="editor_name" type="text" maxlength="32">
-          <div class="row"><div><div class="field-label">Pack weight</div><div class="field-with-unit"><input id="editor_weight" type="number" step="0.1"><div class="unit">lb</div></div></div><div><div class="field-label">Grade</div><div class="field-with-unit"><input id="editor_grade" type="number" step="1"><div class="unit">%</div></div></div></div>
-          <div class="field-label">Terrain factor</div><select id="editor_terrain"><option value="road">Road × 1.0</option><option value="gravel">Gravel × 1.2</option><option value="mixed">Mixed × 1.3</option><option value="sand">Sand × 1.5</option><option value="snow">Snow × 1.5</option></select>
-          <div class="editor-actions"><button id="editor_clear" class="clear-btn" type="button"><svg viewBox="0 0 16 16"><path d="M3 5h10M5 5l1-2h4l1 2M6 7v5M10 7v5M4 5l1 8h6l1-8"/></svg>Clear</button><button id="editor_done" class="done-btn" type="button"><svg viewBox="0 0 16 16"><path d="M6.5 11.5 3.8 8.8l1.4-1.4 1.3 1.3 4.3-4.3 1.4 1.4z"/></svg>Done</button></div>
-        </div>
       </section>
       <section class="tab" id="tab-calories">
-        <div class="section"><div class="subhead"><svg viewBox="0 0 16 16"><path d="M8 1c2 2 3 4 3 6a3 3 0 1 1-6 0c0-1.3.4-2.5 1.3-3.9C5.9 5.1 5.6 6 5.6 7a2.4 2.4 0 0 0 4.8 0c0-1-.4-2-1.2-3.3C9 3.3 8.4 2.2 8 1z"/></svg>CALORIES / HOUR</div></div>
-        <div class="chart-card"><div class="pace-row"><select id="chart_speed" class="pace-select"><option value="20">Pace 20:00 /km</option><option value="15">Pace 15:00 /km</option><option value="12" selected>Pace 12:00 /km</option><option value="10">Pace 10:00 /km</option></select></div><div id="calorie_chart"></div></div>
+        <div class="section"><div class="subhead"><svg viewBox="0 0 16 16"><path d="M9 1c-.5 2.5.5 4 1.5 5.5C11.5 8 12 9 11 11c-.5 1-1.5 2-3 2.5 1-1 1.2-2.5.5-3.5-.5 1.5-1.5 2-2 2.5.5-1.5-.5-3-1-4C5 10 4.5 11.5 5 13c-1-1-1.5-2.5-1-4.5.5-2 2-3.5 2-5.5C7 4.5 7.5 6 8 7c0-2 .5-4 1-6z"/></svg>CALORIES / HOUR</div></div>
+        <div class="chart-card"><div class="pace-row"><div class="row"><div><div class="field-label" style="margin-top:0">Pace</div><div class="field-with-unit"><select id="chart_speed"><option value="10">10:00</option><option value="12" selected>12:00</option><option value="15">15:00</option><option value="20">20:00</option></select><div class="unit" id="pace_unit">/km</div></div></div><div></div></div></div><div id="calorie_chart" style="margin-top:14px"></div></div>
       </section>
       <section class="tab" id="tab-history">
         <div class="section"><div class="subhead"><svg viewBox="0 0 16 16"><path d="M8 1a7 7 0 1 0 .01 14.01A7 7 0 0 0 8 1zm0 1.2A5.8 5.8 0 1 1 2.2 8 5.8 5.8 0 0 1 8 2.2zm-.5 2v4.1l3.1 1.9.6-1-2.7-1.6V4.2z"/></svg>HISTORY</div><div class="section-chip">READ ONLY</div></div>
@@ -415,34 +452,36 @@
     function terrainLabel(type,factor){if(type==="road"||type==="gravel"||type==="mixed"||type==="sand"||type==="snow"){return type.charAt(0).toUpperCase()+type.slice(1);}if(factor<=110){return "Road";}if(factor<=125){return "Gravel";}if(factor<=140){return "Mixed";}return "Sand";}
     var state = clone(INITIAL_STATE);
     var defaults = clone(DEFAULTS);
-    var draftProfiles = [profileFromState(0), profileFromState(1), profileFromState(2)];
     var activeTab = "profiles";
-    var editingProfile = null;
     function profileFromState(index){var n=index+1;return {name:state["profile"+n+"_name"]||"",ruck_weight_value:toInt(state["profile"+n+"_ruck_weight_value"]),terrain_type:state["profile"+n+"_terrain_type"]||"road",terrain_factor:toInt(state["profile"+n+"_terrain_factor"])||terrainFactor(state["profile"+n+"_terrain_type"]||"road"),grade_percent:toInt(state["profile"+n+"_grade_percent"])};}
+    var draftProfiles = [profileFromState(0), profileFromState(1), profileFromState(2)];
     function unit(){return toInt($("measurement_unit").value);}
     function isImperial(){return unit()===1;}
     function sharedWeightKg(){var v=parseFloat($("weight_value").value)||0;return isImperial()?v*0.453592:v;}
     function profileKcal(p){var w=sharedWeightKg();if(w<=0)return 0;var l=(toInt(p.ruck_weight_value)/10)*0.453592;var pace=parseFloat($("chart_speed").value)||12;var sp=60/pace;var grade=toInt(p.grade_percent);var factor=toInt(p.terrain_factor)||terrainFactor(p.terrain_type);var V=sp/3.6,G=grade/1000,T=factor/100,tot=w+l,ratio=l/w,inner=1.5*V*V+0.35*V*G,mult=(1+Math.sqrt(0.3*V*V)/7+Math.pow(V*ratio,2)/4)*1.1,k=(1.5*w+2*tot*ratio*ratio+T*tot*inner*mult)*3600/4184;var walk=(3.5+0.1*(sp*1000/60))*w*60/200;if(l>0&&k<walk)k=walk+walk*(l/w);return Math.round(k);}
-    function setSharedLabels(){var imp=isImperial();$("body_weight_label_text").textContent=imp?"Body weight (lb)":"Body weight (kg)";$("stride_length_label_text").textContent=imp?"Stride length (in)":"Stride length (cm)";$("body_weight_unit_suffix").textContent=imp?"lb":"kg";$("stride_length_unit_suffix").textContent=imp?"in":"cm";}
-    function convertSharedValues(prev,next){if(prev===next)return;var w=parseFloat($("weight_value").value)||0;var s=parseFloat($("stride_length_value").value)||0;if(next==="1"){$("weight_value").value=(w*2.2046226218).toFixed(1);$("stride_length_value").value=(s*0.3937007874).toFixed(1);}else{$("weight_value").value=(w/2.2046226218).toFixed(1);$("stride_length_value").value=(s/0.3937007874).toFixed(1);}}
+    var PACE_KM_VALUES=[10,12,15,20];var PACE_KM_LABELS=["10:00","12:00","15:00","20:00"];
+    function paceKmToMiLabel(minKm){var minMi=minKm*1.60934;var m=Math.floor(minMi);var s=Math.round((minMi-m)*60);return m+":"+(s<10?"0":"")+s;}
+    function setSharedLabels(){var imp=isImperial();$("body_weight_label_text").textContent="Body weight";$("stride_length_label_text").textContent="Stride length";$("body_weight_unit_suffix").textContent=imp?"lb":"kg";$("stride_length_unit_suffix").textContent=imp?"in":"cm";var sel=$("chart_speed");var cur=sel.value;for(var i=0;i<sel.options.length;i++){sel.options[i].text=imp?paceKmToMiLabel(PACE_KM_VALUES[i]):PACE_KM_LABELS[i];}sel.value=cur;$("pace_unit").textContent=imp?"/mi":"/km";for(var j=0;j<3;j++){var u=$("ie_weight_unit_"+j);if(u)u.textContent=imp?"lb":"kg";}}
+    function convertSharedValues(prev,next){if(prev===next)return;var w=parseFloat($("weight_value").value)||0;var s=parseFloat($("stride_length_value").value)||0;if(next==="1"){$("weight_value").value=(w*2.2046226218).toFixed(1);$("stride_length_value").value=(s*0.3937007874).toFixed(1);}else{$("weight_value").value=(w/2.2046226218).toFixed(1);$("stride_length_value").value=(s/0.3937007874).toFixed(1);}for(var i=0;i<3;i++){var wEl=$("ie_weight_"+i);if(!wEl)continue;var wv=parseFloat(wEl.value)||0;if(next==="1"){wEl.value=(wv*2.2046226218).toFixed(1);}else{wEl.value=(wv/2.2046226218).toFixed(1);}}}
     function renderTabs(){["profiles","calories","history"].forEach(function(name){var active=name===activeTab;$("tab-"+name).classList.toggle("active",active);var btn=document.querySelector('.tab-btn[data-tab="'+name+'"]');if(btn){btn.classList.toggle("active",active);}});}
-    function renderProfileList(){var colors=["#6a8d3f","#d8943d","#b1764d"];var html="";for(var i=0;i<3;i++){var n=i+1;var p=state["profile"+n+"_name"]||"";var w=Math.round(kgTenthsToLbTenths(state["profile"+n+"_ruck_weight_value"])/10);var t=terrainLabel(state["profile"+n+"_terrain_type"],state["profile"+n+"_terrain_factor"]);var g=Math.round(toInt(state["profile"+n+"_grade_percent"])/10);html+='<div class="profile"><div class="profile-top"><div class="profile-name"><span class="swatch" style="background:'+colors[i]+'"></span><span>'+(p||((w>0?w:'--')+'lb, '+t.toLowerCase()))+'</span></div><button type="button" class="edit-btn" data-edit="'+i+'"><svg viewBox="0 0 16 16"><path d="M3 11.5V13h1.5l6.8-6.8-1.5-1.5zM12.3 4.7l-1.9-1.9 1-1a1.2 1.2 0 0 1 1.7 0l.2.2a1.2 1.2 0 0 1 0 1.7z"/></svg></button></div><div class="summary-grid"><div><div class="summary-k">Weight</div><div class="summary-v">'+w+' <small>lb</small></div></div><div><div class="summary-k">Terrain</div><div class="summary-v">'+t+' <small>&times; '+(toInt(state["profile"+n+"_terrain_factor"])/100).toFixed(1)+'</small></div></div><div><div class="summary-k">Grade</div><div class="summary-v">'+g+' <small>%</small></div></div></div></div>';}$("profile_list").innerHTML=html;Array.prototype.forEach.call($("profile_list").querySelectorAll("[data-edit]"),function(btn){btn.onclick=function(){openEditor(toInt(this.getAttribute("data-edit")));};});}
-    function fillEditorFromDraft(index){var p=draftProfiles[index];$("editor_name").value=p.name||"";$("editor_weight").value=(kgTenthsToLbTenths(p.ruck_weight_value)/10).toFixed(1);$("editor_grade").value=Math.round(toInt(p.grade_percent)/10);$("editor_terrain").value=p.terrain_type||"road";$("editor_preview_kcal").textContent=profileKcal(p);}
-    function syncDraftFromEditor(){if(editingProfile===null)return;var p=draftProfiles[editingProfile];p.name=($("editor_name").value||"").trim().slice(0,32);p.ruck_weight_value=lbTenthsToKgTenths(Math.round((parseFloat($("editor_weight").value)||0)*10));p.grade_percent=(toInt($("editor_grade").value)||0)*10;p.terrain_type=$("editor_terrain").value;p.terrain_factor=terrainFactor(p.terrain_type);$("editor_preview_kcal").textContent=profileKcal(p);}
-    function renderEditor(){var editor=$("editor");if(editingProfile===null){editor.classList.remove("active");return;}editor.classList.add("active");fillEditorFromDraft(editingProfile);}
-    function openEditor(index){editingProfile=index;renderEditor();drawCalories();}
-    function clearEditor(){if(editingProfile===null)return;draftProfiles[editingProfile]={name:"",ruck_weight_value:0,terrain_type:"road",terrain_factor:100,grade_percent:0};fillEditorFromDraft(editingProfile);drawCalories();}
-    function drawCalories(){var pace=parseFloat($("chart_speed").value)||12;var sp=60/pace;var w=sharedWeightKg();function walkKcalHr(wKg,spKmh){var sm=spKmh*1000/60;return(3.5+0.1*sm)*wKg*60/200;}var bars=[{name:"Walk",kcal:Math.round(walkKcalHr(w,sp)),color:"#8f95a1"}];for(var i=0;i<3;i++){var p=(editingProfile===i?draftProfiles[i]:profileFromState(i));bars.push({name:state["profile"+(i+1)+"_name"]||("P"+(i+1)),kcal:profileKcal(p),color:["#6a8d3f","#d8943d","#b1764d"][i]});}var max=0;for(var j=0;j<bars.length;j++){if(bars[j].kcal>max)max=bars[j].kcal;}var html="";for(var k=0;k<bars.length;k++){var b=bars[k];var pct=max>0?(b.kcal/max*100):0;html+='<div class="legend-row"><div class="legend-dot" style="background:'+b.color+'"></div><div class="legend-name">'+b.name+'</div><div class="bar"><div class="fill" style="width:'+pct.toFixed(1)+'%;background:'+b.color+'"></div></div><div class="kcal">'+b.kcal+' <small>kcal</small></div></div>';}$("calorie_chart").innerHTML=html;if(editingProfile!==null){$("editor_preview_kcal").textContent=profileKcal(draftProfiles[editingProfile]);}}
-    function renderHistory(){$("lifetime_distance_km_total").innerHTML=(Math.round((toInt(state.lifetime_distance_m_total)/10))/100).toFixed(2)+' <small>km</small>';$("lifetime_calories_total").textContent=toInt(state.lifetime_calories_total);var ts=toInt(state.last_activity_timestamp);if(ts>0){var d=new Date(ts*1000);var mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];$("last_activity_datetime").textContent=mo+" "+d.getDate()+" · "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);}else{$("last_activity_datetime").textContent="--";}$("last_activity_distance_km").innerHTML=(Math.round((toInt(state.last_activity_distance_m)/10))/100).toFixed(2)+' <small>km</small>';var pace=toInt(state.last_activity_pace_sec);$("last_activity_pace").innerHTML=pace>0?Math.floor(pace/60)+":"+("0"+(pace%60)).slice(-2)+' <small>/km</small>':'--';var dur=toInt(state.last_activity_duration_sec);$("last_activity_duration").textContent=dur>0?Math.floor(dur/3600)+":"+("0"+Math.floor((dur%3600)/60)).slice(-2)+":"+("0"+(dur%60)).slice(-2):'--';$("last_activity_calories_display").textContent=toInt(state.last_activity_calories);}
+    function profileDisplayName(draft){var imp=isImperial();var w=Math.round((imp?kgTenthsToLbTenths(draft.ruck_weight_value):draft.ruck_weight_value/10));var t=terrainLabel(draft.terrain_type,draft.terrain_factor);var unit=imp?"lb":"kg";return draft.name||(( w>0?w:"--")+unit+", "+t.toLowerCase());}
+    function renderProfileSummary(idx){var draft=draftProfiles[idx];var imp=isImperial();var w=Math.round(imp?kgTenthsToLbTenths(draft.ruck_weight_value)/10:draft.ruck_weight_value/10);var wUnit=imp?"lb":"kg";var t=terrainLabel(draft.terrain_type,draft.terrain_factor);var g=Math.round(toInt(draft.grade_percent)/10);return '<div class="summary-grid" id="profile_summary_'+idx+'"><div><div class="summary-k">Weight</div><div class="summary-v">'+w+' <small>'+wUnit+'</small></div></div><div><div class="summary-k">Terrain</div><div class="summary-v">'+t+' <small>× '+(toInt(draft.terrain_factor)/100).toFixed(1)+'</small></div></div><div><div class="summary-k">Grade</div><div class="summary-v">'+g+' <small>%</small></div></div></div>';}
+    function renderProfileList(){var colors=["#6a8d3f","#d8943d","#b1764d"];var html="";var imp=isImperial();var terrainOpts='<option value="road">Road × 1.0</option><option value="gravel">Gravel × 1.2</option><option value="mixed">Mixed × 1.3</option><option value="sand">Sand × 1.5</option><option value="snow">Snow × 1.5</option>';for(var i=0;i<3;i++){var d=draftProfiles[i];var wDisp=(imp?(kgTenthsToLbTenths(d.ruck_weight_value)/10):(d.ruck_weight_value/10)).toFixed(1);var gDisp=Math.round(toInt(d.grade_percent)/10);var kcal=profileKcal(d);html+='<div class="profile" id="profile_card_'+i+'"><div class="profile-top"><div class="profile-name"><span class="swatch" style="background:'+colors[i]+'"></span><span id="profile_display_name_'+i+'">'+profileDisplayName(d)+'</span></div><div style="display:flex;align-items:center;gap:8px"><div class="profile-kcal-badge" id="profile_kcal_'+i+'">'+kcal+' <small>kcal/h</small></div><button type="button" class="edit-btn" data-edit="'+i+'"><svg viewBox="0 0 16 16"><path d="M3 11.5V13h1.5l6.8-6.8-1.5-1.5zM12.3 4.7l-1.9-1.9 1-1a1.2 1.2 0 0 1 1.7 0l.2.2a1.2 1.2 0 0 1 0 1.7z"/></svg></button></div></div>'+renderProfileSummary(i)+'<div class="inline-editor" id="profile_editor_'+i+'"><div class="field-label" style="margin-top:0">Profile name</div><input id="ie_name_'+i+'" type="text" maxlength="32" value="'+(d.name||"").replace(/"/g,"&quot;")+'"><div class="row"><div><div class="field-label">Pack weight</div><div class="field-with-unit"><input id="ie_weight_'+i+'" type="number" step="0.1" value="'+wDisp+'"><div class="unit" id="ie_weight_unit_'+i+'">'+(imp?"lb":"kg")+'</div></div></div><div><div class="field-label">Grade</div><div class="field-with-unit"><input id="ie_grade_'+i+'" type="number" step="1" value="'+gDisp+'"><div class="unit">%</div></div></div></div><div class="field-label">Terrain</div><select id="ie_terrain_'+i+'">'+terrainOpts.replace('value="'+d.terrain_type+'"','value="'+d.terrain_type+'" selected')+'</select><div class="editor-actions"><button type="button" class="done-btn" data-done="'+i+'"><svg viewBox="0 0 16 16"><path d="M6.5 11.5 3.8 8.8l1.4-1.4 1.3 1.3 4.3-4.3 1.4 1.4z"/></svg>Done</button></div></div></div>';}$("profile_list").innerHTML=html;for(var j=0;j<3;j++){(function(idx){var editBtn=$("profile_card_"+idx).querySelector("[data-edit]");editBtn.onclick=function(){toggleProfileEditor(idx);};var doneBtn=$("profile_card_"+idx).querySelector("[data-done]");doneBtn.onclick=function(){closeProfileEditor(idx);};(function(){var t=null;function s(){if(t)clearTimeout(t);t=setTimeout(function(){syncProfile(idx);},0);}["ie_name_","ie_weight_","ie_grade_","ie_terrain_"].forEach(function(pfx){var el=$(pfx+idx);if(!el)return;["input","change","keyup","pointerup"].forEach(function(ev){el.addEventListener(ev,s);});});})();})(j);}}
+    function toggleProfileEditor(idx){var card=$("profile_card_"+idx);var editor=$("profile_editor_"+idx);var isOpen=editor.classList.contains("open");if(isOpen){closeProfileEditor(idx);}else{editor.classList.add("open");card.classList.add("editing");var sumEl=$("profile_summary_"+idx);if(sumEl)sumEl.style.display="none";}}
+    function closeProfileEditor(idx){var card=$("profile_card_"+idx);var editor=$("profile_editor_"+idx);editor.classList.remove("open");card.classList.remove("editing");syncProfile(idx);var nameEl=$("profile_display_name_"+idx);if(nameEl)nameEl.textContent=profileDisplayName(draftProfiles[idx]);var sumEl=$("profile_summary_"+idx);if(sumEl){sumEl.outerHTML=renderProfileSummary(idx);}}
+    function syncProfile(idx){var d=draftProfiles[idx];d.name=($("ie_name_"+idx).value||"").trim().slice(0,32);var wv=parseFloat($("ie_weight_"+idx).value)||0;d.ruck_weight_value=isImperial()?lbTenthsToKgTenths(Math.round(wv*10)):Math.round(wv*10);d.grade_percent=(toInt($("ie_grade_"+idx).value)||0)*10;d.terrain_type=$("ie_terrain_"+idx).value;d.terrain_factor=terrainFactor(d.terrain_type);var kcalEl=$("profile_kcal_"+idx);if(kcalEl)kcalEl.innerHTML=profileKcal(d)+' <small>kcal/h</small>';}
+    function updateAllProfileKcal(){for(var i=0;i<3;i++){var el=$("profile_kcal_"+i);if(el)el.innerHTML=profileKcal(draftProfiles[i])+' <small>kcal/h</small>';}}
+    function drawCalories(){var pace=parseFloat($("chart_speed").value)||12;var sp=60/pace;var w=sharedWeightKg();function walkKcalHr(wKg,spKmh){var sm=spKmh*1000/60;return(3.5+0.1*sm)*wKg*60/200;}var bars=[{name:"Walk",kcal:Math.round(walkKcalHr(w,sp)),color:"#8f95a1"}];for(var i=0;i<3;i++){bars.push({name:draftProfiles[i].name||("P"+(i+1)),kcal:profileKcal(draftProfiles[i]),color:["#6a8d3f","#d8943d","#b1764d"][i]});}var max=0;for(var j=0;j<bars.length;j++){if(bars[j].kcal>max)max=bars[j].kcal;}var html="";for(var k=0;k<bars.length;k++){var b=bars[k];var pct=max>0?(b.kcal/max*100):0;html+='<div class="legend-row"><div class="legend-dot" style="background:'+b.color+'"></div><div class="legend-name">'+b.name+'</div><div class="bar"><div class="fill" style="width:'+pct.toFixed(1)+'%;background:'+b.color+'"></div></div><div class="kcal">'+b.kcal+' <small>kcal</small></div></div>';}$("calorie_chart").innerHTML=html;updateAllProfileKcal();}
+    function renderHistory(){var imp=isImperial();function fmtDist(meters){var m=toInt(meters);if(imp){var mi=(m/1609.344);return mi.toFixed(2)+' <small>mi</small>';}return (Math.round(m/10)/100).toFixed(2)+' <small>km</small>';}function fmtPace(secPerKm){if(!secPerKm)return '--';if(imp){var spm=Math.round(secPerKm*1.60934);return Math.floor(spm/60)+":"+("0"+(spm%60)).slice(-2)+' <small>/mi</small>';}return Math.floor(secPerKm/60)+":"+("0"+(secPerKm%60)).slice(-2)+' <small>/km</small>';}$("lifetime_distance_km_total").innerHTML=fmtDist(state.lifetime_distance_m_total);$("lifetime_calories_total").textContent=toInt(state.lifetime_calories_total);var ts=toInt(state.last_activity_timestamp);if(ts>0){var d=new Date(ts*1000);var mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];$("last_activity_datetime").textContent=mo+" "+d.getDate()+" · "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);}else{$("last_activity_datetime").textContent="--";}$("last_activity_distance_km").innerHTML=fmtDist(state.last_activity_distance_m);$("last_activity_pace").innerHTML=fmtPace(toInt(state.last_activity_pace_sec));var dur=toInt(state.last_activity_duration_sec);$("last_activity_duration").textContent=dur>0?Math.floor(dur/3600)+":"+("0"+Math.floor((dur%3600)/60)).slice(-2)+":"+("0"+(dur%60)).slice(-2):'--';$("last_activity_calories_display").textContent=toInt(state.last_activity_calories);}
     function showTab(name){activeTab=name;renderTabs();if(name==="calories"){drawCalories();}if(name==="history"){renderHistory();}}
-    function saveAll(){syncDraftFromEditor();var u=unit();var wv=parseFloat($("weight_value").value)||0;var sv=parseFloat($("stride_length_value").value)||0;var out={measurement_unit:u,weight_unit:u,stride_length_unit:u,weight_value:u===1?lbTenthsToKgTenths(Math.round(wv*10)):Math.round(wv*10),stride_length_value:u===1?inTenthsToCmTenths(Math.round(sv*10)):Math.round(sv*10)};for(var i=0;i<3;i++){draftToState(i,draftProfiles[i]);out["profile"+(i+1)+"_ruck_weight_value"]=draftProfiles[i].ruck_weight_value;out["profile"+(i+1)+"_terrain_type"]=draftProfiles[i].terrain_type;out["profile"+(i+1)+"_terrain_factor"]=draftProfiles[i].terrain_factor;out["profile"+(i+1)+"_grade_percent"]=draftProfiles[i].grade_percent;out["profile"+(i+1)+"_name"]=draftProfiles[i].name;}var payload=encodeURIComponent(JSON.stringify(out));var ret=(location.search.match(/[?&]return_to=([^&]*)/)||[])[1];location.href=ret?decodeURIComponent(ret)+payload:"pebblejs://close#"+payload;}
-    function draftToState(index,p){var n=index+1;state["profile"+n+"_name"]=p.name;state["profile"+n+"_ruck_weight_value"]=p.ruck_weight_value;state["profile"+n+"_terrain_type"]=p.terrain_type;state["profile"+n+"_terrain_factor"]=p.terrain_factor;state["profile"+n+"_grade_percent"]=p.grade_percent;}
+    function saveAll(){var u=unit();var wv=parseFloat($("weight_value").value)||0;var sv=parseFloat($("stride_length_value").value)||0;var out={measurement_unit:u,weight_unit:u,stride_length_unit:u,weight_value:u===1?lbTenthsToKgTenths(Math.round(wv*10)):Math.round(wv*10),stride_length_value:u===1?inTenthsToCmTenths(Math.round(sv*10)):Math.round(sv*10)};for(var i=0;i<3;i++){out["profile"+(i+1)+"_ruck_weight_value"]=draftProfiles[i].ruck_weight_value;out["profile"+(i+1)+"_terrain_type"]=draftProfiles[i].terrain_type;out["profile"+(i+1)+"_terrain_factor"]=draftProfiles[i].terrain_factor;out["profile"+(i+1)+"_grade_percent"]=draftProfiles[i].grade_percent;out["profile"+(i+1)+"_name"]=draftProfiles[i].name;}var payload=encodeURIComponent(JSON.stringify(out));var ret=(location.search.match(/[?&]return_to=([^&]*)/)||[])[1];location.href=ret?decodeURIComponent(ret)+payload:"pebblejs://close#"+payload;}
     function initSharedFields(){var u=toInt(state.measurement_unit);$("measurement_unit").value=String(u);$("measurement_unit").dataset.unit=String(u);$("weight_value").value=(u===1?(kgTenthsToLbTenths(state.weight_value)/10):(toInt(state.weight_value)/10)).toFixed(1);$("stride_length_value").value=(u===1?(cmTenthsToInTenths(state.stride_length_value)/10):(toInt(state.stride_length_value)/10)).toFixed(u===1?1:0);setSharedLabels();}
-    initSharedFields();renderProfileList();renderEditor();renderHistory();drawCalories();renderTabs();
-    $("measurement_unit").addEventListener("change",function(){var prev=this.dataset.unit||this.value;convertDisplayedValues(prev,this.value);this.dataset.unit=this.value;setSharedLabels();drawCalories();});
-    $("weight_value").addEventListener("input",drawCalories);$("stride_length_value").addEventListener("input",drawCalories);$("chart_speed").addEventListener("change",drawCalories);
-    ["editor_name","editor_weight","editor_grade","editor_terrain"].forEach(function(id){$(id).addEventListener("input",function(){syncDraftFromEditor();drawCalories();});$(id).addEventListener("change",function(){syncDraftFromEditor();drawCalories();});});
-    $("editor_clear").addEventListener("click",clearEditor);$("editor_done").addEventListener("click",function(){editingProfile=null;renderEditor();});$("save").addEventListener("click",saveAll);
+    initSharedFields();renderProfileList();renderHistory();drawCalories();renderTabs();
+    $("measurement_unit").addEventListener("change",function(){var prev=this.dataset.unit||this.value;convertSharedValues(prev,this.value);this.dataset.unit=this.value;setSharedLabels();drawCalories();renderHistory();});
+    $("weight_value").addEventListener("input",function(){updateAllProfileKcal();drawCalories();});
+    $("stride_length_value").addEventListener("input",drawCalories);
+    $("chart_speed").addEventListener("change",drawCalories);
+    $("save").addEventListener("click",saveAll);
     Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"),function(btn){btn.addEventListener("click",function(){showTab(this.getAttribute("data-tab"));});});
   </script>
 </body>
