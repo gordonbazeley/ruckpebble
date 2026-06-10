@@ -1344,18 +1344,17 @@ static void prv_ruck_prompt_select(void) {
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) {
     if (s_ruck_prompt_selected_row == 0) {
       prv_resume_in_progress_session();
-      if (window_stack_contains_window(s_ruck_prompt_window)) {
-        window_stack_remove(s_ruck_prompt_window, true);
-      }
-      prv_update_display();
     } else {
       prv_clear_in_progress_session();
       prv_start_session();
-      if (window_stack_contains_window(s_ruck_prompt_window)) {
-        window_stack_remove(s_ruck_prompt_window, true);
-      }
-      prv_update_display();
     }
+    if (window_stack_contains_window(s_profile_window)) {
+      window_stack_remove(s_profile_window, false);
+    }
+    if (window_stack_contains_window(s_ruck_prompt_window)) {
+      window_stack_remove(s_ruck_prompt_window, true);
+    }
+    prv_update_display();
     return;
   }
 
