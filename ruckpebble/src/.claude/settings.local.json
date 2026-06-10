@@ -37,7 +37,11 @@
       "Bash(pkill -f \"pebble install\")",
       "Bash(arm-none-eabi-addr2line *)",
       "Bash(/Users/gordonbazeley/Library/Application Support/Pebble SDK/SDKs/4.9.148/toolchain/arm-none-eabi/bin/arm-none-eabi-addr2line *)",
-      "Bash(python create_screenshots.py --profile-screenshot /tmp/ruck_profile.png --tracking-screenshot /tmp/ruck_tracking_raw.png)"
+      "Bash(python create_screenshots.py --profile-screenshot /tmp/ruck_profile.png --tracking-screenshot /tmp/ruck_tracking_raw.png)",
+      "Bash(node -e ' *)",
+      "Bash(node *)",
+      "Bash(grep -n '\\\\${' /Users/gordonbazeley/src/ruckpebble/ruckpebble/src/pkjs/index.js)",
+      "Bash(git *)"
     ]
   }
 }

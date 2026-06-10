@@ -872,6 +872,10 @@ static void prv_update_display(void) {
 
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   prv_update_display();
+  // Persist session state every minute so a sudden OS kill loses at most 60s of data.
+  if (s_session_active && tick_time->tm_sec == 0) {
+    prv_save_in_progress_session();
+  }
 }
 
 static void prv_health_handler(HealthEventType event, void *context) {
@@ -1870,6 +1874,13 @@ static void prv_init(void) {
 
   window_stack_push(s_window, false);
   window_stack_push(s_profile_window, true);
+
+  // If the app was killed mid-session (e.g. by a notification), jump straight
+  // to the restore prompt rather than leaving the user on the profile screen.
+  if (prv_has_resumable_session_for_profile(prv_active_profile_index())) {
+    s_ruck_prompt_mode = RUCK_PROMPT_MODE_RESTORE;
+    window_stack_push(s_ruck_prompt_window, true);
+  }
 }
 
 static void prv_deinit(void) {
