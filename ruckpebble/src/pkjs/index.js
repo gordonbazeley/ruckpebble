@@ -17,7 +17,7 @@
     stride_length_value: 780,
     stride_length_unit: 0,
     measurement_unit: 0,
-    ruck_weight_unit: 0,
+    ruck_weight_unit: 1,
 
     profile1_ruck_weight_value: 136,
     profile1_terrain_factor: 100,
@@ -132,7 +132,7 @@
     out.profile1_ruck_weight_value = parseInt(out.profile1_ruck_weight_value, 10) || 0;
     out.profile2_ruck_weight_value = parseInt(out.profile2_ruck_weight_value, 10) || 0;
     out.profile3_ruck_weight_value = parseInt(out.profile3_ruck_weight_value, 10) || 0;
-    out.ruck_weight_unit = parseInt(out.ruck_weight_unit, 10) || 0;
+    var rwu = parseInt(out.ruck_weight_unit, 10); out.ruck_weight_unit = isNaN(rwu) ? 1 : rwu;
     out.weight_unit = out.measurement_unit;
     out.stride_length_unit = out.measurement_unit;
     out.lifetime_distance_m_total = parseInt(out.lifetime_distance_m_total, 10) || 0;
@@ -288,10 +288,6 @@
     bodyLines.push(distKm + ' km' + (cal > 0 ? ' \u00b7 ' + cal + ' kcal' : ''));
     if (paceSec > 0) {
       bodyLines.push('Pace: ' + Math.floor(paceSec / 60) + ':' + ('0' + (paceSec % 60)).slice(-2) + ' / km');
-    }
-    if (durationSec > 0) {
-      var durationMin = Math.max(1, Math.round(durationSec / 60));
-      bodyLines.push(durationMin + (durationMin === 1 ? ' minute' : ' minutes'));
     }
 
     var titleMin = Math.max(1, Math.round(durationSec / 60));

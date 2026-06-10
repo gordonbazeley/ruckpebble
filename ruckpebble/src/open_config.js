@@ -151,10 +151,19 @@ if (!capturedUrl) {
 }
 
 var html;
+var initialSettingsData = null;
 if (capturedUrl.indexOf('base64,') !== -1) {
   html = Buffer.from(capturedUrl.split('base64,')[1], 'base64').toString('utf8');
 } else if (capturedUrl.startsWith('data:text/html,')) {
   html = decodeURIComponent(capturedUrl.slice('data:text/html,'.length));
+} else if (capturedUrl.startsWith('https://') || capturedUrl.startsWith('http://')) {
+  var localConfigPath = path.resolve(__dirname, '..', 'docs', 'config.html');
+  if (!fs.existsSync(localConfigPath)) {
+    console.error('Error: ' + localConfigPath + ' not found.');
+    process.exit(1);
+  }
+  html = fs.readFileSync(localConfigPath, 'utf8');
+  try { initialSettingsData = new URL(capturedUrl).searchParams.get('data'); } catch (e) {}
 } else {
   console.error('Unexpected config URL format:', capturedUrl.slice(0, 40));
   process.exit(1);
@@ -287,7 +296,7 @@ server.listen(0, '127.0.0.1', function() {
 
   var base = 'http://127.0.0.1:' + port;
   var returnTo = encodeURIComponent(base + '/save?data=');
-  var configUrl = base + '/?return_to=' + returnTo;
+  var configUrl = base + '/?return_to=' + returnTo + (initialSettingsData ? '&data=' + encodeURIComponent(initialSettingsData) : '');
 
   try {
     child_process.execSync('open -a "Brave Browser" ' + JSON.stringify(configUrl));
