@@ -3,7 +3,7 @@ name: Deploy Pages
 on:
   push:
     branches: [main]
-    paths: [docs/**]
+    paths: [ruckpebble/docs/**]
   workflow_dispatch:
 
 permissions:
