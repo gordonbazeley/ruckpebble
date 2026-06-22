@@ -11,7 +11,6 @@
 #define PROFILE_ROW_SEPARATOR_HEIGHT 1
 #define PROFILE_GRADE_TEXT_WIDTH 30
 #define PACE_HISTORY_SECONDS 60
-#define LOG_HEALTH_STEP_CADENCE 1
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -136,10 +135,8 @@ static time_t s_day_start;
 static int32_t s_steps_baseline = 0;
 static int32_t s_last_steps = 0;
 static time_t s_last_time = 0;
-#if LOG_HEALTH_STEP_CADENCE
 static int32_t s_logged_steps_total = -1;
 static time_t s_logged_steps_time = 0;
-#endif
 static int64_t s_speed_mmps = 0;
 static int32_t s_session_distance_m = 0;
 static int32_t s_session_calories = 0;
@@ -239,7 +236,6 @@ static int32_t prv_current_step_count(time_t now) {
   return (int32_t)steps;
 }
 
-#if LOG_HEALTH_STEP_CADENCE
 static void prv_log_health_step_cadence(time_t now, int32_t steps_total_day) {
   if (!s_health_available || steps_total_day == s_logged_steps_total) {
     return;
@@ -257,7 +253,6 @@ static void prv_log_health_step_cadence(time_t now, int32_t steps_total_day) {
   s_logged_steps_total = steps_total_day;
   s_logged_steps_time = now;
 }
-#endif
 
 static void prv_set_profile_name(int32_t profile_index, const char *name) {
   if (profile_index < 0 || profile_index >= PROFILE_COUNT) {
@@ -656,9 +651,7 @@ static void prv_update_display(void) {
   int32_t steps = s_session_steps_offset;
   int32_t steps_total_day = 0;
   steps_total_day = prv_current_step_count(now);
-#if LOG_HEALTH_STEP_CADENCE
   prv_log_health_step_cadence(now, steps_total_day);
-#endif
   if (s_health_available) {
     int32_t steps_since_baseline = steps_total_day - s_steps_baseline;
     if (steps_since_baseline < 0) {

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import re
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -29,20 +30,15 @@ SCREEN_LAYOUTS = {
         },
         "footer_box": (910, 20, 1490, 280),
     },
-    "settings": {
-        "canvas_size": (1800, 1700),
-        "mock_box": (660, 70, 460, 1466),
-        "sections": {
-            "Shared":        {"anchor": (16,   65), "box": (50,  130, 460), "side": "left"},
-            "Profile 1":     {"anchor": (16,  232), "box": (50,  240, 460), "side": "left"},
-            "Profile 2":     {"anchor": (16,  438), "box": (1290, 220, 460), "side": "right"},
-            "Profile 3":     {"anchor": (16,  886), "box": (50,  680, 460), "side": "left"},
-            "Tracked Totals":{"anchor": (16, 1085), "box": (1290, 730, 460), "side": "right"},
-            "Last Activity": {"anchor": (16, 1178), "box": (1290, 940, 460), "side": "right"},
-        },
-        "footer_box": (1270, 20, 1770, 170),
-    },
 }
+
+# Settings page: each section maps to one or more real screenshots (stacked vertically)
+SETTINGS_SECTIONS = [
+    {"name": "About you", "files": ["settings_about_you.png"], "side": "right"},
+    {"name": "Profiles",  "files": ["settings_profiles.png", "settings_profile_edit.png"], "side": "left"},
+    {"name": "Calories",  "files": ["settings_calories.png"],  "side": "right"},
+    {"name": "History",   "files": ["settings_history.png"],   "side": "left"},
+]
 
 
 def load_font(size, bold=False):
@@ -68,10 +64,7 @@ def load_font(size, bold=False):
 def parse_documents(path):
     text = path.read_text()
     blocks = [block.strip() for block in re.split(r"(?m)^\s*---\s*$", text) if block.strip()]
-    docs = []
-    for block in blocks:
-        docs.append(parse_document(block))
-    return docs
+    return [parse_document(block) for block in blocks]
 
 
 def parse_document(text):
@@ -102,8 +95,6 @@ def parse_document(text):
             value = m.group(2).strip()
             doc["sections"][current_section][key] = value
             current_key = key
-            # Track where the value starts so continuation lines can preserve
-            # relative indentation (used to distinguish bullet nesting levels).
             colon_idx = raw_line.index(":")
             value_start_col = colon_idx + 2
             continue
@@ -237,91 +228,21 @@ def place_watch(canvas, screenshot, scale=1.0, top=150):
     return wx, top, watch.width, watch.height
 
 
-def draw_mock_card(draw, box, title, lines, fill="#ffffff", outline="#d7dbe0"):
-    x, y, w, h = box
-    draw.rounded_rectangle((x, y, x + w, y + h), radius=10, fill=fill, outline=outline, width=2)
-    title_font = load_font(24, True)
-    body_font = load_font(18)
-    draw.text((x + 16, y + 12), title, fill="#111111", font=title_font)
-    yy = y + 48
-    for label, value in lines:
-        draw.text((x + 16, yy), label, fill="#555555", font=body_font)
-        draw.rounded_rectangle((x + 170, yy - 2, x + w - 16, yy + 24), radius=6, fill="#f7f7f7", outline="#e2e2e2", width=1)
-        draw.text((x + 182, yy), value, fill="#111111", font=body_font)
-        yy += 34
-
-
-def place_settings_mock(canvas, layout):
-    x, y, w, h = layout["mock_box"]
-    page = Image.new("RGB", (w, h), "#eaf3ff")
-    draw = ImageDraw.Draw(page)
-    title_font = load_font(30, True)
-    subtitle_font = load_font(18)
-    draw.text((18, 16), "Ruck Settings", fill="#111111", font=title_font)
-    draw.text((18, 52), "Shared watch settings, the three ruck profiles, totals, and the last activity summary", fill="#555555", font=subtitle_font)
-
-    draw_mock_card(draw, (16, 88, 528, 150), "Shared", [
-        ("Body weight", "81.5"),
-        ("Ruck weight unit", "lb"),
-        ("Stride length", "79.0"),
-    ])
-    draw_mock_card(draw, (16, 252, 528, 180), "Profile 1", [
-        ("Profile name", "30lb, road"),
-        ("Ruck weight", "30.0"),
-        ("Terrain", "Road (1.0)"),
-        ("Grade (%)", "0"),
-    ])
-    draw_mock_card(draw, (16, 448, 528, 180), "Profile 2", [
-        ("Profile name", "30lb, hilly"),
-        ("Ruck weight", "30.0"),
-        ("Terrain", "Road (1.0)"),
-        ("Grade (%)", "0"),
-    ])
-    draw_mock_card(draw, (16, 644, 528, 180), "Profile 3", [
-        ("Profile name", "15lb, road"),
-        ("Ruck weight", "15.0"),
-        ("Terrain", "Road (1.0)"),
-        ("Grade (%)", "0"),
-    ])
-    draw_mock_card(draw, (16, 840, 528, 132), "Tracked Totals", [
-        ("Lifetime distance (km)", "--"),
-        ("Lifetime calories", "--"),
-    ])
-    draw_mock_card(draw, (16, 988, 528, 154), "Last Activity", [
-        ("Date / Time", "--"),
-        ("Distance (km)", "--"),
-        ("Pace", "--"),
-        ("Calories", "--"),
-    ])
-    draw.rounded_rectangle((16, 1156, 528, 1214), radius=10, fill="#111111", outline="#111111", width=2)
-    draw.text((36, 1173), "Save", fill="#ffffff", font=load_font(22, True))
-    draw.rounded_rectangle((344, 1156, 528, 1214), radius=10, fill="#666666", outline="#666666", width=2)
-    draw.text((381, 1173), "Reset", fill="#ffffff", font=load_font(22, True))
-
-    canvas.paste(page, (x, y))
-    return x, y, w, h
-
-
-def place_settings_screenshot(canvas, layout, screenshot_path):
-    x, y, target_w, _ = layout["mock_box"]
-    img = Image.open(screenshot_path).convert("RGB")
-    scale = target_w / img.width
-    new_h = int(img.height * scale)
-    img = img.resize((target_w, new_h), Image.Resampling.LANCZOS)
+def place_framed_screenshot(canvas, img, x, y):
+    shadow = Image.new("RGBA", (img.width + 20, img.height + 20), (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle(
+        (10, 10, img.width + 10, img.height + 10), radius=12, fill=(0, 0, 0, 40)
+    )
+    canvas.paste(shadow, (x - 10, y - 10), shadow)
+    ImageDraw.Draw(canvas).rounded_rectangle(
+        (x - 3, y - 3, x + img.width + 3, y + img.height + 3), radius=8, fill="#cccccc"
+    )
     canvas.paste(img, (x, y))
-    return x, y, target_w, new_h
 
 
 def render_screen(doc, screenshot_path, output_path):
     title = doc["title"].lower()
-    if "profile" in title:
-        screen_key = "profile"
-    elif "tracking" in title:
-        screen_key = "tracking"
-    elif "settings" in title:
-        screen_key = "settings"
-    else:
-        screen_key = "tracking"
+    screen_key = "tracking" if "tracking" in title else "profile"
 
     layout = SCREEN_LAYOUTS[screen_key]
     canvas = Image.new("RGB", layout.get("canvas_size", (1500, 1000)), "#f6f7f8")
@@ -343,37 +264,14 @@ def render_screen(doc, screenshot_path, output_path):
             draw.text((58, yy), line, fill="#555555", font=f_subtitle)
             yy += 24
 
-    if screen_key == "settings":
-        if screenshot_path and Path(screenshot_path).exists():
-            wx, wy, watch_w, watch_h = place_settings_screenshot(canvas, layout, screenshot_path)
-        else:
-            wx, wy, watch_w, watch_h = place_settings_mock(canvas, layout)
+    wx, wy, watch_w, watch_h = place_watch(canvas, screenshot_path)
 
-        def to_canvas_point(point):
-            return (wx + int(point[0]) - 20, wy + int(point[1]))
-    else:
-        wx, wy, watch_w, watch_h = place_watch(canvas, screenshot_path)
+    def to_canvas_point(point):
+        return (wx + int(point[0]), wy + int(point[1]))
 
-        def to_canvas_point(point):
-            return (wx + int(point[0]), wy + int(point[1]))
-
-    sections_layout = dict(layout["sections"])
-    if screen_key == "settings" and "Profile 1" in sections_layout and "Profile 3" in sections_layout:
-        p1_bx, p1_by, p1_bw = sections_layout["Profile 1"]["box"]
-        p1_body = doc["sections"].get("Profile 1", {}).get("description", "")
-        p1_lines = layout_lines(draw, p1_body, f_box_body, p1_bw - 32)
-        p1_height = 32 + 30 + len(p1_lines) * 24
-        p3 = sections_layout["Profile 3"]
-        p3_new_by = p1_by + p1_height + 20
-        sections_layout["Profile 3"] = {**p3, "box": (p3["box"][0], p3_new_by, p3["box"][2])}
-
-    for section_name, section_layout in sections_layout.items():
-        if screen_key == "settings" and section_name == "Header":
-            continue
+    for section_name, section_layout in layout["sections"].items():
         section = doc["sections"].get(section_name, {})
         body = section.get("description", "")
-        if not body and section_name == "Header":
-            body = section.get("subtitle", "")
         if not body:
             continue
         bx, by, bw = section_layout["box"]
@@ -406,50 +304,155 @@ def render_screen(doc, screenshot_path, output_path):
     return output_path
 
 
+def render_settings_screen(doc, screenshots_dir, output_path):
+    SCREENSHOT_W = 420
+    CANVAS_W = 1800
+    SECTION_GAP = 70
+    IMG_GAP = 24
+    HEADER_H = 120
+    PAD = 40
+    CALLOUT_W = 580
+    IMG_X = (CANVAS_W - SCREENSHOT_W) // 2  # = 690
+
+    f_title = load_font(44, True)
+    f_subtitle = load_font(20)
+    f_box_title = load_font(25, True)
+    f_box_body = load_font(20)
+
+    screenshots_dir = Path(screenshots_dir)
+
+    def load_img(filename):
+        p = screenshots_dir / filename
+        if not p.exists():
+            return None
+        img = Image.open(p).convert("RGB")
+        return img.resize((SCREENSHOT_W, int(img.height * SCREENSHOT_W / img.width)), Image.Resampling.LANCZOS)
+
+    section_imgs = {}
+    for s in SETTINGS_SECTIONS:
+        imgs = []
+        for f in s["files"]:
+            img = load_img(f)
+            if img:
+                imgs.append(img)
+        section_imgs[s["name"]] = imgs
+
+    # Compute section y positions from screenshot heights
+    section_ys = {}
+    y = HEADER_H
+    for s in SETTINGS_SECTIONS:
+        imgs = section_imgs[s["name"]]
+        if not imgs:
+            continue
+        section_ys[s["name"]] = y
+        total_img_h = sum(i.height for i in imgs) + IMG_GAP * (len(imgs) - 1)
+        y += total_img_h + SECTION_GAP
+
+    canvas = Image.new("RGB", (CANVAS_W, y + PAD), "#f6f7f8")
+    draw = ImageDraw.Draw(canvas)
+
+    # Header
+    header = doc["sections"].get("Header", {})
+    draw.text((56, 40), header.get("title", doc["title"]), fill="#111111", font=f_title)
+    subtitle = header.get("subtitle", "")
+    if subtitle:
+        yy = 92
+        for line in wrap_text(draw, subtitle, f_subtitle, CANVAS_W - 116):
+            draw.text((58, yy), line, fill="#555555", font=f_subtitle)
+            yy += 24
+
+    LEFT_CALLOUT_X = 20
+    RIGHT_CALLOUT_X = CANVAS_W - 20 - CALLOUT_W  # = 1200
+
+    for s in SETTINGS_SECTIONS:
+        name = s["name"]
+        imgs = section_imgs.get(name, [])
+        if not imgs:
+            continue
+
+        sec_y = section_ys[name]
+        total_img_h = sum(i.height for i in imgs) + IMG_GAP * (len(imgs) - 1)
+
+        # Draw screenshots stacked vertically
+        iy = sec_y
+        for img in imgs:
+            place_framed_screenshot(canvas, img, IMG_X, iy)
+            iy += img.height + IMG_GAP
+
+        # Anchor at vertical midpoint of the screenshot group
+        mid_img_y = sec_y + total_img_h // 2
+        if s["side"] == "left":
+            callout_x = LEFT_CALLOUT_X
+            anchor = (IMG_X, mid_img_y)
+        else:
+            callout_x = RIGHT_CALLOUT_X
+            anchor = (IMG_X + SCREENSHOT_W, mid_img_y)
+
+        body = doc["sections"].get(name, {}).get("description", "")
+        if body:
+            callout_h = render_callout(draw, f_box_title, f_box_body,
+                                       (callout_x, sec_y, CALLOUT_W), name, body)
+            mid_callout_y = sec_y + callout_h // 2
+            if s["side"] == "left":
+                link_start = (callout_x + CALLOUT_W, mid_callout_y)
+            else:
+                link_start = (callout_x, mid_callout_y)
+            draw_link(draw, link_start, anchor)
+
+        draw_anchor(draw, anchor)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(output_path)
+    return output_path
+
+
 def output_name_for_doc(doc):
     title = doc["title"].lower()
-    if "profile" in title:
-        return "ruck_profile_screen_annotated.png"
     if "tracking" in title:
         return "ruck_tracking_screen_annotated.png"
-    if "settings" in title:
+    if "profile" in title and "javascript" not in title and "setting" not in title:
+        return "ruck_profile_screen_annotated.png"
+    if "setting" in title or "javascript" in title:
         return "ruck_settings_page_annotated.png"
     slug = re.sub(r"[^a-z0-9]+", "_", title).strip("_") or "screen"
     return f"{slug}_annotated.png"
 
 
 def main():
+    default_screenshots = str(Path(__file__).with_name("screenshots"))
     parser = argparse.ArgumentParser()
     parser.add_argument("--spec", default=str(Path(__file__).with_name("screenshot_descriptions.md")))
-    parser.add_argument("--profile-screenshot", default="/tmp/ruck_profile.png")
-    parser.add_argument("--tracking-screenshot", default="/tmp/ruck_tracking_raw.png")
-    parser.add_argument("--settings-screenshot", default=None)
+    parser.add_argument("--screenshots-dir", default=default_screenshots,
+                        help="Directory containing profile.jpeg, rucking.jpeg, and settings_*.png")
     parser.add_argument("--output-dir", default=str(Path(__file__).with_name("explainer_screenshots")))
     args = parser.parse_args()
 
     docs = parse_documents(Path(args.spec))
+    screenshots_dir = Path(args.screenshots_dir)
     outputs = []
 
     for doc in docs:
         title = doc["title"].lower()
-        if "profile" in title:
-            screenshot = Path(args.profile_screenshot)
-        elif "tracking" in title:
-            screenshot = Path(args.tracking_screenshot)
-        elif "settings" in title:
-            screenshot = Path(args.settings_screenshot) if args.settings_screenshot else None
-        else:
-            continue
-        if screenshot is None or not screenshot.exists():
-            import sys
-            print(f"Skipping '{doc['title']}': screenshot not found at {screenshot}", file=sys.stderr)
-            print(f"  Capture it with: pebble screenshot --emulator emery {screenshot}", file=sys.stderr)
-            continue
         output = Path(args.output_dir) / output_name_for_doc(doc)
-        outputs.append(render_screen(doc, screenshot, output))
+
+        if "setting" in title or "javascript" in title:
+            outputs.append(render_settings_screen(doc, screenshots_dir, output))
+        elif "tracking" in title:
+            screenshot = screenshots_dir / "rucking.jpeg"
+            if not screenshot.exists():
+                print(f"Skipping '{doc['title']}': {screenshot} not found", file=sys.stderr)
+                continue
+            outputs.append(render_screen(doc, screenshot, output))
+        elif "profile" in title:
+            screenshot = screenshots_dir / "profile.jpeg"
+            if not screenshot.exists():
+                print(f"Skipping '{doc['title']}': {screenshot} not found", file=sys.stderr)
+                continue
+            outputs.append(render_screen(doc, screenshot, output))
 
     for output in outputs:
-        print(output)
+        if output:
+            print(output)
 
 
 if __name__ == "__main__":

@@ -254,10 +254,6 @@ var server = http.createServer(function(req, res) {
     // sendAppMessageLog[0] is the settings message from syncSettingsToWatch
     var watchMsg = sendAppMessageLog[0];
     if (watchMsg) syncToWatch(watchMsg);
-    var savedSnapshot = {};
-    try {
-      savedSnapshot = JSON.parse(storageData[SETTINGS_KEY] || '{}');
-    } catch (e) {}
 
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end([

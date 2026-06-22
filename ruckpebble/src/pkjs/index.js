@@ -52,7 +52,7 @@
     for (var i = 0; i < arguments.length; i += 1) {
       var src = arguments[i] || {};
       for (var key in src) {
-        if (hasOwn(src, key)) {
+        if (Object.prototype.hasOwnProperty.call(src, key)) {
           out[key] = src[key];
         }
       }
@@ -77,13 +77,9 @@
   }
 
 
-  function hasOwn(obj, key) {
-    return Object.prototype.hasOwnProperty.call(obj, key);
-  }
-
   function hasAny(obj, keys) {
     for (var i = 0; i < keys.length; i += 1) {
-      if (hasOwn(obj, keys[i])) {
+      if (Object.prototype.hasOwnProperty.call(obj, keys[i])) {
         return true;
       }
     }
@@ -99,10 +95,10 @@
   }
 
   function readIntFromPayload(payload, nameKey, numericKey, fallback) {
-    if (hasOwn(payload, nameKey)) {
+    if (Object.prototype.hasOwnProperty.call(payload, nameKey)) {
       return toInt(payload[nameKey], fallback);
     }
-    if (hasOwn(payload, String(numericKey))) {
+    if (Object.prototype.hasOwnProperty.call(payload, String(numericKey))) {
       return toInt(payload[String(numericKey)], fallback);
     }
     return fallback;
@@ -403,7 +399,7 @@
     // Never allow config form submit to clobber live totals/last-activity snapshots.
     var current = normalizeSettings(loadSettings());
     var incoming = normalizeSettings(settings);
-    var merged = assignObjects(incoming);
+    var merged = incoming;
     merged.lifetime_distance_m_total = Math.max(current.lifetime_distance_m_total, incoming.lifetime_distance_m_total);
     merged.lifetime_calories_total = Math.max(current.lifetime_calories_total, incoming.lifetime_calories_total);
     if (incoming.last_activity_timestamp >= current.last_activity_timestamp) {

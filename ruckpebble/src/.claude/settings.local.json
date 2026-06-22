@@ -41,7 +41,17 @@
       "Bash(node -e ' *)",
       "Bash(node *)",
       "Bash(grep -n '\\\\${' /Users/gordonbazeley/src/ruckpebble/ruckpebble/src/pkjs/index.js)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(bash src/run.sh)",
+      "Bash(unset PYTHONPATH)",
+      "Bash(unset PYTHONHOME)",
+      "Bash(env -u PYTHONPATH -u PYTHONHOME pebble build)",
+      "Bash(bash -c 'unset PYTHONPATH; unset PYTHONHOME; pebble build')",
+      "Bash(python3.13 --version)",
+      "Bash(jobs -l)",
+      "Bash(kill %2)",
+      "Bash(grep *)",
+      "Bash(bash src/create_screenshots.sh)"
     ]
   }
 }
