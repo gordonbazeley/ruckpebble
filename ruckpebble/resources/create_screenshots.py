@@ -32,13 +32,15 @@ SCREEN_LAYOUTS = {
     },
 }
 
-# Settings page: each section maps to one or more real screenshots (stacked vertically)
+# Per-section screenshot mapping for the settings page
 SETTINGS_SECTIONS = [
     {"name": "About you", "files": ["settings_about_you.png"], "side": "right"},
     {"name": "Profiles",  "files": ["settings_profiles.png", "settings_profile_edit.png"], "side": "left"},
     {"name": "Calories",  "files": ["settings_calories.png"],  "side": "right"},
     {"name": "History",   "files": ["settings_history.png"],   "side": "left"},
 ]
+
+SETTINGS_SECTION_NAMES = {s["name"] for s in SETTINGS_SECTIONS}
 
 
 def load_font(size, bold=False):
@@ -90,19 +92,26 @@ def parse_document(text):
             current_key = None
             continue
         m = re.match(r"^-\s*([A-Za-z0-9_]+):\s*(.*)$", line)
-        if m and current_section:
+        if m:
             key = m.group(1).lower()
             value = m.group(2).strip()
-            doc["sections"][current_section][key] = value
+            if current_section is not None:
+                doc["sections"][current_section][key] = value
+            else:
+                # Top-level key-value (settings section docs have no ## headings)
+                doc[key] = value
             current_key = key
             colon_idx = raw_line.index(":")
             value_start_col = colon_idx + 2
             continue
-        if current_section and current_key:
+        if current_key:
             raw_indent = len(raw_line) - len(raw_line.lstrip())
             relative_indent = max(0, raw_indent - value_start_col)
             normalized = " " * relative_indent + line
-            doc["sections"][current_section][current_key] += "\n" + normalized
+            if current_section is not None:
+                doc["sections"][current_section][current_key] += "\n" + normalized
+            else:
+                doc[current_key] += "\n" + normalized
     return doc
 
 
@@ -304,20 +313,22 @@ def render_screen(doc, screenshot_path, output_path):
     return output_path
 
 
-def render_settings_screen(doc, screenshots_dir, output_path):
+def render_settings_section(doc, screenshots_dir, output_path):
+    CANVAS_W = 1600
     SCREENSHOT_W = 420
-    CANVAS_W = 1800
-    SECTION_GAP = 70
     IMG_GAP = 24
-    HEADER_H = 120
     PAD = 40
-    CALLOUT_W = 580
-    IMG_X = (CANVAS_W - SCREENSHOT_W) // 2  # = 690
+    SECTION_TOP = 80
+    CALLOUT_W = 550
+    IMG_X = (CANVAS_W - SCREENSHOT_W) // 2  # = 590
 
-    f_title = load_font(44, True)
-    f_subtitle = load_font(20)
+    f_title = load_font(36, True)
     f_box_title = load_font(25, True)
     f_box_body = load_font(20)
+
+    section = next((s for s in SETTINGS_SECTIONS if s["name"] == doc["title"]), None)
+    if section is None:
+        return None
 
     screenshots_dir = Path(screenshots_dir)
 
@@ -328,78 +339,52 @@ def render_settings_screen(doc, screenshots_dir, output_path):
         img = Image.open(p).convert("RGB")
         return img.resize((SCREENSHOT_W, int(img.height * SCREENSHOT_W / img.width)), Image.Resampling.LANCZOS)
 
-    section_imgs = {}
-    for s in SETTINGS_SECTIONS:
-        imgs = []
-        for f in s["files"]:
-            img = load_img(f)
-            if img:
-                imgs.append(img)
-        section_imgs[s["name"]] = imgs
+    imgs = []
+    for f in section["files"]:
+        img = load_img(f)
+        if img is not None:
+            imgs.append(img)
 
-    # Compute section y positions from screenshot heights
-    section_ys = {}
-    y = HEADER_H
-    for s in SETTINGS_SECTIONS:
-        imgs = section_imgs[s["name"]]
-        if not imgs:
-            continue
-        section_ys[s["name"]] = y
-        total_img_h = sum(i.height for i in imgs) + IMG_GAP * (len(imgs) - 1)
-        y += total_img_h + SECTION_GAP
+    if not imgs:
+        print(f"Skipping '{doc['title']}': no screenshots found in {screenshots_dir}", file=sys.stderr)
+        return None
 
-    canvas = Image.new("RGB", (CANVAS_W, y + PAD), "#f6f7f8")
+    total_img_h = sum(i.height for i in imgs) + IMG_GAP * (len(imgs) - 1)
+    canvas_h = SECTION_TOP + PAD + total_img_h + PAD
+
+    canvas = Image.new("RGB", (CANVAS_W, canvas_h), "#f6f7f8")
     draw = ImageDraw.Draw(canvas)
 
-    # Header
-    header = doc["sections"].get("Header", {})
-    draw.text((56, 40), header.get("title", doc["title"]), fill="#111111", font=f_title)
-    subtitle = header.get("subtitle", "")
-    if subtitle:
-        yy = 92
-        for line in wrap_text(draw, subtitle, f_subtitle, CANVAS_W - 116):
-            draw.text((58, yy), line, fill="#555555", font=f_subtitle)
-            yy += 24
+    draw.text((56, 22), doc["title"], fill="#111111", font=f_title)
 
-    LEFT_CALLOUT_X = 20
-    RIGHT_CALLOUT_X = CANVAS_W - 20 - CALLOUT_W  # = 1200
+    # Draw screenshots stacked vertically in the centre
+    iy = SECTION_TOP + PAD
+    for img in imgs:
+        place_framed_screenshot(canvas, img, IMG_X, iy)
+        iy += img.height + IMG_GAP
 
-    for s in SETTINGS_SECTIONS:
-        name = s["name"]
-        imgs = section_imgs.get(name, [])
-        if not imgs:
-            continue
+    # Anchor at vertical midpoint of the screenshot group's near edge
+    mid_img_y = SECTION_TOP + PAD + total_img_h // 2
+    if section["side"] == "left":
+        callout_x = 20
+        anchor = (IMG_X, mid_img_y)
+    else:
+        callout_x = IMG_X + SCREENSHOT_W + 20  # = 1030
+        anchor = (IMG_X + SCREENSHOT_W, mid_img_y)
 
-        sec_y = section_ys[name]
-        total_img_h = sum(i.height for i in imgs) + IMG_GAP * (len(imgs) - 1)
-
-        # Draw screenshots stacked vertically
-        iy = sec_y
-        for img in imgs:
-            place_framed_screenshot(canvas, img, IMG_X, iy)
-            iy += img.height + IMG_GAP
-
-        # Anchor at vertical midpoint of the screenshot group
-        mid_img_y = sec_y + total_img_h // 2
-        if s["side"] == "left":
-            callout_x = LEFT_CALLOUT_X
-            anchor = (IMG_X, mid_img_y)
+    body = doc.get("description", "")
+    if body:
+        callout_y = SECTION_TOP + PAD
+        callout_h = render_callout(draw, f_box_title, f_box_body,
+                                   (callout_x, callout_y, CALLOUT_W), doc["title"], body)
+        mid_callout_y = callout_y + callout_h // 2
+        if section["side"] == "left":
+            link_start = (callout_x + CALLOUT_W, mid_callout_y)
         else:
-            callout_x = RIGHT_CALLOUT_X
-            anchor = (IMG_X + SCREENSHOT_W, mid_img_y)
+            link_start = (callout_x, mid_callout_y)
+        draw_link(draw, link_start, anchor)
 
-        body = doc["sections"].get(name, {}).get("description", "")
-        if body:
-            callout_h = render_callout(draw, f_box_title, f_box_body,
-                                       (callout_x, sec_y, CALLOUT_W), name, body)
-            mid_callout_y = sec_y + callout_h // 2
-            if s["side"] == "left":
-                link_start = (callout_x + CALLOUT_W, mid_callout_y)
-            else:
-                link_start = (callout_x, mid_callout_y)
-            draw_link(draw, link_start, anchor)
-
-        draw_anchor(draw, anchor)
+    draw_anchor(draw, anchor)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(output_path)
@@ -410,12 +395,10 @@ def output_name_for_doc(doc):
     title = doc["title"].lower()
     if "tracking" in title:
         return "ruck_tracking_screen_annotated.png"
-    if "profile" in title and "javascript" not in title and "setting" not in title:
+    if "profile screen" in title:
         return "ruck_profile_screen_annotated.png"
-    if "setting" in title or "javascript" in title:
-        return "ruck_settings_page_annotated.png"
     slug = re.sub(r"[^a-z0-9]+", "_", title).strip("_") or "screen"
-    return f"{slug}_annotated.png"
+    return f"ruck_settings_{slug}_annotated.png"
 
 
 def main():
@@ -432,21 +415,23 @@ def main():
     outputs = []
 
     for doc in docs:
-        title = doc["title"].lower()
+        title = doc["title"]
         output = Path(args.output_dir) / output_name_for_doc(doc)
 
-        if "setting" in title or "javascript" in title:
-            outputs.append(render_settings_screen(doc, screenshots_dir, output))
-        elif "tracking" in title:
+        if title in SETTINGS_SECTION_NAMES:
+            result = render_settings_section(doc, screenshots_dir, output)
+            if result:
+                outputs.append(result)
+        elif "tracking" in title.lower():
             screenshot = screenshots_dir / "rucking.jpeg"
             if not screenshot.exists():
-                print(f"Skipping '{doc['title']}': {screenshot} not found", file=sys.stderr)
+                print(f"Skipping '{title}': {screenshot} not found", file=sys.stderr)
                 continue
             outputs.append(render_screen(doc, screenshot, output))
-        elif "profile" in title:
+        elif "profile" in title.lower():
             screenshot = screenshots_dir / "profile.jpeg"
             if not screenshot.exists():
-                print(f"Skipping '{doc['title']}': {screenshot} not found", file=sys.stderr)
+                print(f"Skipping '{title}': {screenshot} not found", file=sys.stderr)
                 continue
             outputs.append(render_screen(doc, screenshot, output))
 

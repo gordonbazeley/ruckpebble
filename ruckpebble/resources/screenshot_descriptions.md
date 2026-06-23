@@ -60,15 +60,12 @@
 
 ---
 
-# JavaScript Settings Page
-## Header
-- title: Ruck Settings
-- subtitle: Set up your ruck profiles.
-
-## About you
+# About you
 - description: Settings for body weight, ruck weight unit, and stride length.
 
-## Profiles
+---
+
+# Profiles
 - description: Sets the name, ruck weight, terrain, and grade used when this profile is selected on the watch.
                * Ruck weight - The more weight you carry the more calories you burn.
                  * NB. We use lb for all ruck weights since ruck plates are commonly sold in lb rather than kg.
@@ -79,11 +76,14 @@
                  * Or calculate it yourself as Total ascent (metres) / (0.5 × Distance (kilometres)
                The estimated calorie burn per profile updates as you change the fields.
                Click on the pencil button to edit a profile or the i buttons for more info.
+---
 
-## Calories
+# Calories
 - description: Shows a chart with the estimated calorie burn for each profile vs an unweighted walk.
 
-## History
+---
+
+# History
 - description: Shows a summary of the rucks you've carried out and the last ruck 
                * Lifetime totals for distance and calories accumulated from all saved rucks.
                * The most recent ruck saved from the watch, including date, distance, pace, and calories.
