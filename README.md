@@ -10,7 +10,7 @@ The images below explain how to set up and use the app - please raise an issue i
 
 ## Phone settings
 ![About You](ruckpebble/resources/explainer_screenshots/ruck_settings_about_you_annotated.png)
-!Profiles](ruckpebble/resources/explainer_screenshots/ruck_settings_profiles_annotated.png)
+![Profiles](ruckpebble/resources/explainer_screenshots/ruck_settings_profiles_annotated.png)
 ![Calories](ruckpebble/resources/explainer_screenshots/ruck_settings_calories_annotated.png)
 ![History](ruckpebble/resources/explainer_screenshots/ruck_settings_history_annotated.png)
 
