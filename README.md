@@ -17,5 +17,5 @@ The images below explain how to set up and use the app - please raise an issue i
 --- 
 
 ## Thanks
-* Pandolf equation published by Goruck at https://www.goruck.com/en-gb/pages/rucking-calorie-calculator 
+* Pandolf equation published by Goruck [here](https://www.goruck.com/en-gb/pages/rucking-calorie-calculator)
 * Display layout heavily inspired by the Garmin Walker data field by wwarby
