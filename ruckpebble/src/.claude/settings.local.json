@@ -51,7 +51,10 @@
       "Bash(jobs -l)",
       "Bash(kill %2)",
       "Bash(grep *)",
-      "Bash(bash src/create_screenshots.sh)"
+      "Bash(bash src/create_screenshots.sh)",
+      "Bash(mkdir /Users/gordonbazeley/src/ruckpebble/dev_docs)",
+      "Bash(mv /Users/gordonbazeley/src/ruckpebble/docs/*.md /Users/gordonbazeley/src/ruckpebble/dev_docs/)",
+      "Bash(rmdir /Users/gordonbazeley/src/ruckpebble/docs)"
     ]
   }
 }
