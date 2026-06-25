@@ -8,9 +8,9 @@ RuckPebble is a Pebble smartwatch app for tracking rucking (weighted walking/hik
 ┌─────────────────────┐      AppMessage       ┌──────────────────────┐
 │   Pebble Watch      │ ◄──────────────────── │  Phone Companion JS  │
 │   (C / ruckpebble.c)│ ──────────────────►   │  (pkjs/index.js)     │
-└─────────────────────┘                        └──────────┬───────────┘
-                                                          │  openURL / webviewclosed
-                                                          ▼
+└─────────────────────┘                       └──────────┬───────────┘
+                                                         │  openURL / webviewclosed
+                                                         ▼
                                                ┌──────────────────────┐
                                                │  GitHub Pages        │
                                                │  (docs/config.html)  │

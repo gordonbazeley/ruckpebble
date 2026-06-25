@@ -15,7 +15,7 @@ Before the next ponytail-style cleanup, test the settings page end-to-end on the
 ## Features
 
 ### More than 3 profiles
-Currently hardcoded as 3 everywhere. Full analysis in `src/todo.md`. Least-invasive approach:
+Currently hardcoded as 3 everywhere. Least-invasive approach:
 
 1. Pre-allocate keys for up to N (e.g. 8) profiles in `package.json` (`profile4_*` … `profile8_*`)
 2. Add `profile_count` field to the C `Settings` struct

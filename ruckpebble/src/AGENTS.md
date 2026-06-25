@@ -8,6 +8,7 @@
 - `src/pkjs/` and `src/common/`: optional JavaScript companion code if added later (referenced by `wscript`).
 - `wscript`: Pebble SDK build rules and bundle configuration.
 - `package.json`: Pebble metadata (targets, UUID, resources).
+- `src/dev_docs/`: project context that should be treated as required reading before future changes. Review `architecture.md`, `decisions.md`, `current-state.md`, and `todo.md` together with the code they describe, and keep implementation work aligned with them.
 
 ## Build, Test, and Development Commands
 You have my permissions to always run commands that start with pebble
