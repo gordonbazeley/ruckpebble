@@ -11,6 +11,7 @@
 #define PROFILE_ROW_SEPARATOR_HEIGHT 1
 #define PROFILE_GRADE_TEXT_WIDTH 30
 #define PACE_HISTORY_SECONDS 60
+#define RUCK_CHECKIN_INTERVAL_S 60
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -36,6 +37,7 @@ typedef enum {
   RUCK_PROMPT_MODE_BACK    = 0,
   RUCK_PROMPT_MODE_DOWN    = 1,
   RUCK_PROMPT_MODE_RESTORE = 2,
+  RUCK_PROMPT_MODE_CHECKIN = 3,
 } RuckPromptMode;
 
 enum {
@@ -1351,6 +1353,22 @@ static void prv_ruck_prompt_select(void) {
     return;
   }
 
+  if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_CHECKIN) {
+    prv_resume_in_progress_session();
+    if (s_ruck_prompt_selected_row == 0) {
+      if (window_stack_contains_window(s_profile_window)) {
+        window_stack_remove(s_profile_window, false);
+      }
+      if (window_stack_contains_window(s_ruck_prompt_window)) {
+        window_stack_remove(s_ruck_prompt_window, true);
+      }
+      prv_update_display();
+    } else {
+      prv_ruck_prompt_save();
+    }
+    return;
+  }
+
   // RUCK_PROMPT_MODE_BACK
   if (s_ruck_prompt_selected_row == 0) {
     prv_ruck_prompt_discard();
@@ -1373,7 +1391,8 @@ static void prv_ruck_prompt_up_click_handler(ClickRecognizerRef recognizer, void
 static void prv_ruck_prompt_down_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
-  int32_t max_row = (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) ? 1 : 2;
+  int32_t max_row = (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE ||
+                      s_ruck_prompt_mode == RUCK_PROMPT_MODE_CHECKIN) ? 1 : 2;
   if (s_ruck_prompt_selected_row < max_row) {
     s_ruck_prompt_selected_row += 1;
   }
@@ -1389,7 +1408,8 @@ static void prv_ruck_prompt_select_click_handler(ClickRecognizerRef recognizer, 
 static void prv_ruck_prompt_back_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
-  if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) {
+  if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE ||
+      s_ruck_prompt_mode == RUCK_PROMPT_MODE_CHECKIN) {
     s_ruck_prompt_selected_row = 0;
     prv_ruck_prompt_select();
   } else {
@@ -1413,6 +1433,7 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   static const char *k_titles_back[]    = { "Discard ruck", "Save ruck", "Resume ruck" };
   static const char *k_titles_down[]    = { "Save ruck", "Resume ruck", "Discard ruck" };
   static const char *k_titles_restore[] = { "Resume ruck", "Start new" };
+  static const char *k_titles_checkin[] = { "Continue ruck", "End ruck" };
   const char **titles;
   int row_count;
   GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
@@ -1422,6 +1443,8 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
     titles = k_titles_down; row_count = 3;
   } else if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) {
     titles = k_titles_restore; row_count = 2;
+  } else if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_CHECKIN) {
+    titles = k_titles_checkin; row_count = 2;
   } else {
     titles = k_titles_back; row_count = 3;
   }
@@ -1450,7 +1473,8 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
 static void prv_ruck_prompt_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   s_ruck_prompt_selected_row = 0;
-  if (s_ruck_prompt_mode != RUCK_PROMPT_MODE_DOWN && s_ruck_prompt_mode != RUCK_PROMPT_MODE_RESTORE) {
+  if (s_ruck_prompt_mode != RUCK_PROMPT_MODE_DOWN && s_ruck_prompt_mode != RUCK_PROMPT_MODE_RESTORE &&
+      s_ruck_prompt_mode != RUCK_PROMPT_MODE_CHECKIN) {
     s_ruck_prompt_mode = RUCK_PROMPT_MODE_BACK;
   }
   s_ruck_prompt_layer = layer_create(layer_get_bounds(window_layer));
@@ -1772,7 +1796,17 @@ static void prv_window_unload(Window *window) {
   s_paused_icon_layer = NULL;
 }
 
+static void prv_schedule_checkin_wakeup(void) {
+  WakeupId id = wakeup_schedule(time(NULL) + RUCK_CHECKIN_INTERVAL_S, 0, true);
+  if (id < 0) {
+    APP_LOG(APP_LOG_LEVEL_ERROR, "wakeup_schedule failed: %d", (int)id);
+  }
+}
+
 static void prv_init(void) {
+  AppLaunchReason launch_reason_val = launch_reason();
+  wakeup_cancel_all();
+
   prv_load_settings();
   if (persist_exists(APP_STATE_SCHEMA_VERSION_PERSIST_KEY)) {
     int32_t stored_version = persist_read_int(APP_STATE_SCHEMA_VERSION_PERSIST_KEY);
@@ -1869,15 +1903,22 @@ static void prv_init(void) {
 
   // If the app was killed mid-session (e.g. by a notification), jump straight
   // to the restore prompt rather than leaving the user on the profile screen.
+  // A wakeup relaunch gets the "still rucking?" check-in prompt instead of
+  // the restore prompt so the user can end the ruck without fully resuming it.
   if (prv_has_resumable_session_for_profile(prv_active_profile_index())) {
-    s_ruck_prompt_mode = RUCK_PROMPT_MODE_RESTORE;
+    s_ruck_prompt_mode = (launch_reason_val == APP_LAUNCH_WAKEUP) ?
+        RUCK_PROMPT_MODE_CHECKIN : RUCK_PROMPT_MODE_RESTORE;
     window_stack_push(s_ruck_prompt_window, true);
+    if (launch_reason_val == APP_LAUNCH_WAKEUP) {
+      vibes_short_pulse();
+    }
   }
 }
 
 static void prv_deinit(void) {
   if (s_session_active) {
     prv_save_in_progress_session();
+    prv_schedule_checkin_wakeup();
   } else {
     prv_commit_session_totals("deinit");
   }
