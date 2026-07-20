@@ -160,6 +160,7 @@ static int32_t s_last_activity_duration_sec = 0;
 static int32_t s_last_activity_timestamp  = 0;
 static int32_t s_session_pace_sec         = 0;
 static int32_t s_current_pace_sec         = 0;
+static int32_t s_current_spm              = 0;  // steps/min over trailing PACE_HISTORY_SECONDS window; drives round's cadence readout (no HR sensor there)
 static char s_status_text[64] = "Saving ruck...";
 static int32_t s_step_history[PACE_HISTORY_SECONDS];
 static time_t s_step_history_time[PACE_HISTORY_SECONDS];
@@ -371,6 +372,33 @@ static int64_t prv_isqrt(int64_t x) {
   return res;
 }
 
+#if defined(PBL_ROUND)
+// A row/rect placed at a flat x-inset runs under the bezel near a round display's top/bottom;
+// this returns the widest x/w that still clears the circle across a given y-span (narrower of
+// its top/bottom edge, minus margin). PBL_DISPLAY_WIDTH is a per-platform SDK define, so this
+// works for any round platform's actual circle (chalk's 180px, gabbro's 260px, ...).
+static int16_t prv_round_half_width(int16_t y_abs, int16_t r) {
+  int16_t dy = (int16_t)abs(y_abs - r);
+  if (dy >= r) {
+    return 0;
+  }
+  return (int16_t)prv_isqrt((int64_t)r * r - (int64_t)dy * dy);
+}
+
+static void prv_round_row_x(int16_t y_top, int16_t y_bot, int16_t margin, int16_t *out_x, int16_t *out_w) {
+  const int16_t r = PBL_DISPLAY_WIDTH / 2;
+  int16_t hw_top = prv_round_half_width(y_top, r);
+  int16_t hw_bot = prv_round_half_width(y_bot, r);
+  int16_t hw = hw_top < hw_bot ? hw_top : hw_bot;
+  hw -= margin;
+  if (hw < 20) {
+    hw = 20;
+  }
+  *out_x = r - hw;
+  *out_w = hw * 2;
+}
+#endif
+
 static int64_t prv_pandolf_metabolic_mw(int64_t weight_kg1000, int64_t load_kg1000, int64_t speed_mmps) {
   if (weight_kg1000 <= 0) {
     return 0;
@@ -435,8 +463,11 @@ static void prv_set_text_style(TextLayer *layer, GFont font, GTextAlignment alig
 static void prv_grid_layer_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   int w = bounds.size.w;
-  int y_top = 60;
-  int y_bottom = 136;
+  // 60/136 are reference-218 offsets (same frame prv_window_load scales row positions from),
+  // not fixed pixels - otherwise these sit still while the rows around them move on round
+  // platforms and end up drawn through the icons instead of between the rows.
+  int y_top = (bounds.size.h * 60) / 218;
+  int y_bottom = (bounds.size.h * 136) / 218;
 
   graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_context_set_stroke_width(ctx, 1);
@@ -730,6 +761,8 @@ static void prv_update_display(void) {
       if (window_steps < 0) {
         window_steps = 0;
       }
+      s_current_spm = (current_window_s > 0)
+          ? (int32_t)(((int64_t)window_steps * 60) / current_window_s) : 0;
       if (window_steps > 0) {
         current_pace_sec = (current_window_s * unit_mm) / ((int64_t)window_steps * stride_mm);
       }
@@ -836,6 +869,14 @@ static void prv_update_display(void) {
   }
   s_session_calories = (int32_t)ruck_kcal_total;
 
+#if defined(PBL_ROUND)
+  // Chalk has no HR sensor — show live cadence (steps/min) in that slot instead.
+  if (s_current_spm > 0) {
+    snprintf(hr_value_buf, sizeof(hr_value_buf), "%ld", (long)s_current_spm);
+  } else {
+    snprintf(hr_value_buf, sizeof(hr_value_buf), "--");
+  }
+#else
   if (health_service_metric_accessible(HealthMetricHeartRateBPM, now - 300, now)
       & HealthServiceAccessibilityMaskAvailable) {
     HealthValue heart_rate = health_service_peek_current_value(HealthMetricHeartRateBPM);
@@ -847,6 +888,7 @@ static void prv_update_display(void) {
   } else {
     snprintf(hr_value_buf, sizeof(hr_value_buf), "--");
   }
+#endif
 
   text_layer_set_text(s_top_time_layer, profile_name);
   text_layer_set_text(s_top_left_layer, top_time_buf);
@@ -1085,8 +1127,31 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   GRect bounds = layer_get_bounds((Layer *)cell_layer);
   const int16_t row_w = bounds.size.w;
   const int16_t row_h = bounds.size.h;
-  const int16_t content_x = SCREEN_PADDING;
-  const int16_t content_w = row_w - (2 * SCREEN_PADDING);
+  int16_t content_x = SCREEN_PADDING;
+  int16_t content_w = row_w - (2 * SCREEN_PADDING);
+#if defined(PBL_ROUND)
+  // All PROFILE_COUNT rows are visible at once at fixed positions (no real scrolling), so
+  // each row's absolute screen Y is known up front - chord-inset it the same way the main
+  // tracking screen insets its rows, converted back to this cell's local coordinate space.
+  {
+    int16_t abs_top = SCREEN_PADDING + row * (s_profile_cell_height + PROFILE_ROW_SEPARATOR_HEIGHT);
+    int16_t abs_bottom = abs_top + s_profile_cell_height;
+    int16_t rx, rw;
+    prv_round_row_x(abs_top, abs_bottom, 3, &rx, &rw);
+    // The 3-column weight/terrain/grade layout below needs real room - letting rw go as
+    // narrow as prv_round_row_x's generic 40px floor drives grade_col_w/weight_col_w
+    // negative and corrupts the menu's draw state instead of just looking cramped. Floor
+    // it higher here and re-center, accepting minor bezel overhang on the outermost rows
+    // over a crash.
+    const int16_t MIN_ROW_CONTENT_W = 150;
+    if (rw < MIN_ROW_CONTENT_W) {
+      rw = MIN_ROW_CONTENT_W;
+      rx = (PBL_DISPLAY_WIDTH - rw) / 2;
+    }
+    content_x = rx - SCREEN_PADDING;
+    content_w = rw;
+  }
+#endif
   const int16_t value_y = row_h - 31;
   const int16_t icon_y = y + value_y + 2;
   const int16_t weight_icon_w = s_profile_weight_icon ? gbitmap_get_bounds(s_profile_weight_icon).size.w : 0;
@@ -1096,7 +1161,9 @@ static void prv_profile_draw_row_callback(GContext *ctx, const Layer *cell_layer
   const int16_t grade_icon_w = s_profile_grade_icon ? gbitmap_get_bounds(s_profile_grade_icon).size.w : 0;
   const int16_t grade_icon_h = s_profile_grade_icon ? gbitmap_get_bounds(s_profile_grade_icon).size.h : 0;
   const int16_t grade_col_w = grade_icon_w + 1 + PROFILE_GRADE_TEXT_WIDTH;
-  const int16_t remaining_w = content_w - grade_col_w;
+  // Defensive: a negative remaining_w drives weight/terrain_col_w negative, which corrupts
+  // (not just misdraws) menu state further down the graphics stack - never let it through.
+  const int16_t remaining_w = (content_w - grade_col_w) > 0 ? (content_w - grade_col_w) : 0;
   const int16_t weight_col_x = content_x;
   const int16_t weight_col_w = remaining_w / 2;
   const int16_t terrain_col_x = weight_col_x + weight_col_w;
@@ -1680,10 +1747,40 @@ static void prv_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
   int x0 = SCREEN_PADDING;
-  int y0 = SCREEN_PADDING;
   int w = bounds.size.w - (2 * SCREEN_PADDING);
-  int h = bounds.size.h - (2 * SCREEN_PADDING);
-  int header_name_w = (w * 2) / 3;
+
+  // Row Y-offsets below were tuned against emery's usable height (228 - 2*5 = 218).
+  // Round platforms get extra top/bottom margin so the header row isn't squeezed at the
+  // circle's pole; GRID_REFERENCE_H rescales the rest proportionally into what's left.
+  // Gabbro (260px) has enough headroom that this holds without shrinking fonts/icons -
+  // emery's numbers come out pixel-identical since scale(h=218) == 218/218 == 1.
+  const int GRID_REFERENCE_H = 218;
+  int y0 = PBL_IF_ROUND_ELSE(32, SCREEN_PADDING);
+  int h = bounds.size.h - y0 - PBL_IF_ROUND_ELSE(28, SCREEN_PADDING);
+#define SCALE_TO_H(px) ((int)(((int32_t)(px) * h) / GRID_REFERENCE_H))
+
+  int top2_y = y0 + SCALE_TO_H(28);
+  int mid_icon_y = y0 + SCALE_TO_H(70);
+  int mid_value_y = y0 + SCALE_TO_H(90);
+  int mid_center_value_y = mid_icon_y + SCALE_TO_H(22);
+  int bottom_icon_y = y0 + SCALE_TO_H(144);
+  int bottom_value_y = y0 + SCALE_TO_H(162);
+  int bottom_secondary_y = y0 + SCALE_TO_H(188);
+#undef SCALE_TO_H
+
+  int top_x0 = x0, top_w = w;
+  int mid_x0 = x0, mid_w = w;
+  int bottom_x0 = x0, bottom_w = w;
+#if defined(PBL_ROUND)
+  int16_t rx, rw;
+  prv_round_row_x((int16_t)y0, (int16_t)(top2_y + 26), 3, &rx, &rw);
+  top_x0 = rx; top_w = rw;
+  prv_round_row_x((int16_t)mid_icon_y, (int16_t)(mid_value_y + 36), 3, &rx, &rw);
+  mid_x0 = rx; mid_w = rw;
+  prv_round_row_x((int16_t)bottom_icon_y, (int16_t)(bottom_secondary_y + 28), 3, &rx, &rw);
+  bottom_x0 = rx; bottom_w = rw;
+#endif
+  int header_name_w = (top_w * 2) / 3;
 
   window_set_background_color(window, GColorBlack);
   window_set_click_config_provider(window, prv_main_click_config_provider);
@@ -1692,24 +1789,24 @@ static void prv_window_load(Window *window) {
   layer_set_update_proc(s_grid_layer, prv_grid_layer_update_proc);
   layer_add_child(window_layer, s_grid_layer);
 
-  s_top_time_layer = text_layer_create(GRect(x0, y0, header_name_w, 30));
-  s_top_left_layer = text_layer_create(GRect(x0 + header_name_w, y0, w - header_name_w, 30));
-  s_top_right_layer = text_layer_create(GRect(x0, y0 + 28, w / 2, 26));
-  s_top_stats_right_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 28, w - (w / 2), 26));
+  s_top_time_layer = text_layer_create(GRect(top_x0, y0, header_name_w, 30));
+  s_top_left_layer = text_layer_create(GRect(top_x0 + header_name_w, y0, top_w - header_name_w, 30));
+  s_top_right_layer = text_layer_create(GRect(top_x0, top2_y, top_w / 2, 26));
+  s_top_stats_right_layer = text_layer_create(GRect(top_x0 + (top_w / 2), top2_y, top_w - (top_w / 2), 26));
 
-  s_mid_left_icon_layer = bitmap_layer_create(GRect(x0 + (w / 4) - 12, y0 + 70, 24, 24));
-  s_mid_left_value_layer = text_layer_create(GRect(x0, y0 + 90, w / 2, 36));
-  s_mid_center_icon_layer = bitmap_layer_create(GRect(x0 + (w / 2) - 12, y0 + 70, 24, 24));
-  s_mid_center_value_layer = text_layer_create(GRect(x0 + (w / 2) - 24, y0 + 92, 48, 30));
-  s_mid_right_icon_layer = bitmap_layer_create(GRect(x0 + ((w * 3) / 4) - 12, y0 + 70, 24, 24));
-  s_mid_right_value_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 90, w - (w / 2), 36));
+  s_mid_left_icon_layer = bitmap_layer_create(GRect(mid_x0 + (mid_w / 4) - 12, mid_icon_y, 24, 24));
+  s_mid_left_value_layer = text_layer_create(GRect(mid_x0, mid_value_y, mid_w / 2, 36));
+  s_mid_center_icon_layer = bitmap_layer_create(GRect(mid_x0 + (mid_w / 2) - 12, mid_icon_y, 24, 24));
+  s_mid_center_value_layer = text_layer_create(GRect(mid_x0 + (mid_w / 2) - 24, mid_center_value_y, 48, 30));
+  s_mid_right_icon_layer = bitmap_layer_create(GRect(mid_x0 + ((mid_w * 3) / 4) - 12, mid_icon_y, 24, 24));
+  s_mid_right_value_layer = text_layer_create(GRect(mid_x0 + (mid_w / 2), mid_value_y, mid_w - (mid_w / 2), 36));
 
-  s_bottom_left_icon_layer = bitmap_layer_create(GRect(x0 + (w / 4) - 12, y0 + 144, 24, 24));
-  s_bottom_left_value_layer = text_layer_create(GRect(x0, y0 + 162, w / 2, 28));
-  s_bottom_left_secondary_layer = text_layer_create(GRect(x0, y0 + 188, w / 2, 28));
-  s_bottom_right_icon_layer = bitmap_layer_create(GRect(x0 + ((w * 3) / 4) - 12, y0 + 144, 24, 24));
-  s_bottom_right_value_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 162, w - (w / 2), 28));
-  s_bottom_right_secondary_layer = text_layer_create(GRect(x0 + (w / 2), y0 + 188, w - (w / 2), 28));
+  s_bottom_left_icon_layer = bitmap_layer_create(GRect(bottom_x0 + (bottom_w / 4) - 12, bottom_icon_y, 24, 24));
+  s_bottom_left_value_layer = text_layer_create(GRect(bottom_x0, bottom_value_y, bottom_w / 2, 28));
+  s_bottom_left_secondary_layer = text_layer_create(GRect(bottom_x0, bottom_secondary_y, bottom_w / 2, 28));
+  s_bottom_right_icon_layer = bitmap_layer_create(GRect(bottom_x0 + ((bottom_w * 3) / 4) - 12, bottom_icon_y, 24, 24));
+  s_bottom_right_value_layer = text_layer_create(GRect(bottom_x0 + (bottom_w / 2), bottom_value_y, bottom_w - (bottom_w / 2), 28));
+  s_bottom_right_secondary_layer = text_layer_create(GRect(bottom_x0 + (bottom_w / 2), bottom_secondary_y, bottom_w - (bottom_w / 2), 28));
 
   s_runner_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_RUNNER);
   s_heart_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_HEART);
@@ -1717,7 +1814,7 @@ static void prv_window_load(Window *window) {
   s_steps_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_STEPS);
   s_fire_icon = gbitmap_create_with_resource(RESOURCE_ID_ICON_FIRE);
   bitmap_layer_set_bitmap(s_mid_left_icon_layer, s_runner_icon);
-  bitmap_layer_set_bitmap(s_mid_center_icon_layer, s_heart_icon);
+  bitmap_layer_set_bitmap(s_mid_center_icon_layer, PBL_IF_ROUND_ELSE(s_steps_icon, s_heart_icon));
   bitmap_layer_set_bitmap(s_mid_right_icon_layer, s_timer_icon);
   bitmap_layer_set_bitmap(s_bottom_left_icon_layer, s_steps_icon);
   bitmap_layer_set_bitmap(s_bottom_right_icon_layer, s_fire_icon);

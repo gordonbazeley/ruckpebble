@@ -1,8 +1,10 @@
 {
   "name": "RuckPebble",
   "author": "ModusApps",
-  "version": "1.4.2",
-  "keywords": ["pebble-app"],
+  "version": "1.4.3",
+  "keywords": [
+    "pebble-app"
+  ],
   "private": true,
   "dependencies": {},
   "pebble": {
@@ -11,7 +13,8 @@
     "sdkVersion": "3",
     "enableMultiJS": true,
     "targetPlatforms": [
-      "emery"
+      "emery",
+      "gabbro"
     ],
     "watchapp": {
       "watchface": false,
@@ -51,7 +54,11 @@
       "sim_steps_enabled",
       "sim_steps_spm"
     ],
-    "capabilities": ["configurable", "timeline", "health"],
+    "capabilities": [
+      "configurable",
+      "timeline",
+      "health"
+    ],
     "resources": {
       "media": [
         {
