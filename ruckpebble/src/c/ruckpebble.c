@@ -1387,12 +1387,7 @@ static void prv_ruck_prompt_discard(void) {
   s_session_active = false;
   prv_clear_in_progress_session();
   prv_reset_session_state();
-  if (window_stack_contains_window(s_ruck_prompt_window)) {
-    window_stack_remove(s_ruck_prompt_window, true);
-  }
-  if (!window_stack_contains_window(s_profile_window)) {
-    window_stack_push(s_profile_window, true);
-  }
+  window_stack_pop_all(true);
 }
 
 static void prv_ruck_prompt_select(void) {
@@ -1478,16 +1473,19 @@ static void prv_ruck_prompt_select_click_handler(ClickRecognizerRef recognizer, 
   prv_ruck_prompt_select();
 }
 
+static int32_t prv_ruck_prompt_resume_row(RuckPromptMode mode) {
+  switch (mode) {
+    case RUCK_PROMPT_MODE_DOWN: return 1;
+    case RUCK_PROMPT_MODE_BACK: return 2;
+    default: return 0; // RESTORE, CHECKIN
+  }
+}
+
 static void prv_ruck_prompt_back_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
-  if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE ||
-      s_ruck_prompt_mode == RUCK_PROMPT_MODE_CHECKIN) {
-    s_ruck_prompt_selected_row = 0;
-    prv_ruck_prompt_select();
-  } else {
-    prv_ruck_prompt_resume();
-  }
+  s_ruck_prompt_selected_row = prv_ruck_prompt_resume_row(s_ruck_prompt_mode);
+  prv_ruck_prompt_select();
 }
 
 static void prv_ruck_prompt_click_config_provider(void *context) {
