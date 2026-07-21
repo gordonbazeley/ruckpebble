@@ -12,6 +12,8 @@
 #define PROFILE_GRADE_TEXT_WIDTH 30
 #define PACE_HISTORY_SECONDS 60
 #define RUCK_CHECKIN_INTERVAL_S 60
+#define RUCK_CHECKIN_REPEAT_MS 30000
+#define RUCK_CHECKIN_REPEAT_TIMEOUT_S 180
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -94,6 +96,8 @@ static Layer *s_status_layer;
 static AppTimer *s_status_timer;
 static Window *s_ruck_prompt_window;
 static Layer *s_ruck_prompt_layer;
+static AppTimer *s_checkin_repeat_timer;
+static int32_t s_checkin_repeat_elapsed_s;
 static int32_t s_ruck_prompt_mode = 0;
 static int32_t s_ruck_prompt_selected_row = 0;
 static Window *s_window;
@@ -1421,8 +1425,8 @@ static void prv_ruck_prompt_select(void) {
   }
 
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_CHECKIN) {
-    prv_resume_in_progress_session();
     if (s_ruck_prompt_selected_row == 0) {
+      prv_resume_in_progress_session();
       if (window_stack_contains_window(s_profile_window)) {
         window_stack_remove(s_profile_window, false);
       }
@@ -1430,7 +1434,10 @@ static void prv_ruck_prompt_select(void) {
         window_stack_remove(s_ruck_prompt_window, true);
       }
       prv_update_display();
+    } else if (s_ruck_prompt_selected_row == 1) {
+      prv_ruck_prompt_discard();
     } else {
+      prv_resume_in_progress_session();
       prv_ruck_prompt_save();
     }
     return;
@@ -1458,8 +1465,7 @@ static void prv_ruck_prompt_up_click_handler(ClickRecognizerRef recognizer, void
 static void prv_ruck_prompt_down_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
-  int32_t max_row = (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE ||
-                      s_ruck_prompt_mode == RUCK_PROMPT_MODE_CHECKIN) ? 1 : 2;
+  int32_t max_row = (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) ? 1 : 2;
   if (s_ruck_prompt_selected_row < max_row) {
     s_ruck_prompt_selected_row += 1;
   }
@@ -1500,7 +1506,7 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   static const char *k_titles_back[]    = { "Discard ruck", "Save ruck", "Resume ruck" };
   static const char *k_titles_down[]    = { "Save ruck", "Resume ruck", "Discard ruck" };
   static const char *k_titles_restore[] = { "Resume ruck", "Start new" };
-  static const char *k_titles_checkin[] = { "Continue ruck", "End ruck" };
+  static const char *k_titles_checkin[] = { "Resume ruck", "Discard ruck", "Save ruck" };
   const char **titles;
   int row_count;
   GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
@@ -1511,7 +1517,7 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   } else if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) {
     titles = k_titles_restore; row_count = 2;
   } else if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_CHECKIN) {
-    titles = k_titles_checkin; row_count = 2;
+    titles = k_titles_checkin; row_count = 3;
   } else {
     titles = k_titles_back; row_count = 3;
   }
@@ -1537,6 +1543,17 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   }
 }
 
+static void prv_checkin_repeat_timer_callback(void *data) {
+  (void)data;
+  s_checkin_repeat_timer = NULL;
+  s_checkin_repeat_elapsed_s += RUCK_CHECKIN_REPEAT_MS / 1000;
+  if (s_checkin_repeat_elapsed_s >= RUCK_CHECKIN_REPEAT_TIMEOUT_S) {
+    return;
+  }
+  vibes_double_pulse();
+  s_checkin_repeat_timer = app_timer_register(RUCK_CHECKIN_REPEAT_MS, prv_checkin_repeat_timer_callback, NULL);
+}
+
 static void prv_ruck_prompt_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   s_ruck_prompt_selected_row = 0;
@@ -1548,10 +1565,19 @@ static void prv_ruck_prompt_window_load(Window *window) {
   window_set_click_config_provider(window, prv_ruck_prompt_click_config_provider);
   layer_set_update_proc(s_ruck_prompt_layer, prv_ruck_prompt_layer_update_proc);
   layer_add_child(window_layer, s_ruck_prompt_layer);
+
+  if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_CHECKIN) {
+    s_checkin_repeat_elapsed_s = 0;
+    s_checkin_repeat_timer = app_timer_register(RUCK_CHECKIN_REPEAT_MS, prv_checkin_repeat_timer_callback, NULL);
+  }
 }
 
 static void prv_ruck_prompt_window_unload(Window *window) {
   (void)window;
+  if (s_checkin_repeat_timer) {
+    app_timer_cancel(s_checkin_repeat_timer);
+    s_checkin_repeat_timer = NULL;
+  }
   layer_destroy(s_ruck_prompt_layer);
   s_ruck_prompt_layer = NULL;
 }
@@ -2007,7 +2033,7 @@ static void prv_init(void) {
         RUCK_PROMPT_MODE_CHECKIN : RUCK_PROMPT_MODE_RESTORE;
     window_stack_push(s_ruck_prompt_window, true);
     if (launch_reason_val == APP_LAUNCH_WAKEUP) {
-      vibes_short_pulse();
+      vibes_double_pulse();
     }
   }
 }
