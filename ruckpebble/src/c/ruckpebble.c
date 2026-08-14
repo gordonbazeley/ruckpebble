@@ -14,6 +14,7 @@
 #define RUCK_CHECKIN_INTERVAL_S 60
 #define RUCK_CHECKIN_REPEAT_MS 30000
 #define RUCK_CHECKIN_REPEAT_TIMEOUT_S 180
+#define RUCK_STILLNESS_TIMEOUT_S 120
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -153,6 +154,8 @@ static bool s_session_paused = false;
 static time_t s_pause_start_time = 0;
 static int32_t s_pause_total_s = 0;
 static int32_t s_steps_at_pause = 0;
+static int32_t s_steps_at_last_movement = 0;
+static time_t s_last_movement_time = 0;
 static Layer *s_paused_icon_layer = NULL;
 static int32_t s_lifetime_distance_m = 0;
 static int32_t s_lifetime_calories = 0;
@@ -535,6 +538,8 @@ static void prv_resume_in_progress_session(void) {
 
   prv_ensure_health_subscription(now);
   s_steps_baseline = s_health_available ? prv_current_step_count(now) : 0;
+  s_steps_at_last_movement = s_session_steps;
+  s_last_movement_time = now;
 
   APP_LOG(APP_LOG_LEVEL_INFO, "Resumed session: elapsed=%lds dist_offset=%ldm steps_offset=%ld",
           (long)saved_elapsed_s, (long)s_session_distance_offset_m, (long)s_session_steps_offset);
@@ -798,16 +803,8 @@ static void prv_update_display(void) {
   int64_t ruck_kcal_per_hour = (metabolic_mw * 3600) / 4184 / 1000;
   int64_t walk_kcal_per_hour = prv_walking_kcal_per_hour(weight_kg1000, session_speed_mmps);
   int64_t walk_kcal_total = (walk_kcal_per_hour * elapsed_s) / 3600;
-  int64_t load_ratio_q1000 = 0;
-  if (weight_kg1000 > 0) {
-    load_ratio_q1000 = (load_kg1000 * 1000) / weight_kg1000;
-  }
-  if (load_kg1000 > 0 && ruck_kcal_per_hour < walk_kcal_per_hour) {
-    int64_t load_bonus_kcal_per_hour = (walk_kcal_per_hour * load_ratio_q1000) / 1000;
-    if (load_bonus_kcal_per_hour < 1) {
-      load_bonus_kcal_per_hour = 1;
-    }
-    ruck_kcal_per_hour = walk_kcal_per_hour + load_bonus_kcal_per_hour;
+  if (ruck_kcal_per_hour < walk_kcal_per_hour) {
+    ruck_kcal_per_hour = walk_kcal_per_hour;
   }
   int64_t ruck_kcal_total = (ruck_kcal_per_hour * elapsed_s) / 3600;
 
@@ -911,8 +908,33 @@ static void prv_update_display(void) {
   }
 }
 
+static void prv_check_ruck_stillness(time_t now) {
+  if (!s_session_active || s_session_paused || !s_health_available) {
+    return;
+  }
+  if (s_session_steps != s_steps_at_last_movement) {
+    s_steps_at_last_movement = s_session_steps;
+    s_last_movement_time = now;
+    return;
+  }
+  if (s_last_movement_time == 0) {
+    s_last_movement_time = now;
+    return;
+  }
+  if ((now - s_last_movement_time) < RUCK_STILLNESS_TIMEOUT_S) {
+    return;
+  }
+  if (window_stack_contains_window(s_ruck_prompt_window)) {
+    return;
+  }
+  s_ruck_prompt_mode = RUCK_PROMPT_MODE_CHECKIN;
+  window_stack_push(s_ruck_prompt_window, true);
+  vibes_double_pulse();
+}
+
 static void prv_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   prv_update_display();
+  prv_check_ruck_stillness(time(NULL));
   // Persist session state every minute so a sudden OS kill loses at most 60s of data.
   if (s_session_active && tick_time->tm_sec == 0) {
     prv_save_in_progress_session();
@@ -1076,6 +1098,8 @@ static void prv_start_session(void) {
   } else {
     s_steps_baseline = 0;
   }
+  s_steps_at_last_movement = s_session_steps;
+  s_last_movement_time = now;
   APP_LOG(APP_LOG_LEVEL_INFO, "Session start: health_available=%d baseline=%ld",
           (int)s_health_available, (long)s_steps_baseline);
 }
@@ -1697,6 +1721,8 @@ static void prv_main_up_click_handler(ClickRecognizerRef recognizer, void *conte
     s_steps_baseline = prv_current_step_count(now) - steps_since_baseline_at_pause;
     s_last_time = 0;
     s_session_paused = false;
+    s_steps_at_last_movement = s_session_steps;
+    s_last_movement_time = now;
   } else {
     s_pause_start_time = now;
     int32_t steps_since_baseline = prv_current_step_count(now) - s_steps_baseline;
