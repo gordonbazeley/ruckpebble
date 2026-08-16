@@ -23,6 +23,7 @@ Ruckpebble is free and always will be. If it's earned a spot on your watch, you 
 Doctor's orders: one coffee a day. So it had better be a good one :-)
 
 [![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/gordonbazeley)
+
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2.png?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/gordonbazeley)
 
 ## Thanks
