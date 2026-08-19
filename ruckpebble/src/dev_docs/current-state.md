@@ -13,9 +13,13 @@ Schema version: **2**
 - Profile selection screen with up to 3 profiles; touch selects profile, centre button starts ruck
 - Rucking screen shows: profile name, session pace, current pace (60s rolling), steps (session + today), current time, distance, heart rate, elapsed time, calories (ruck + walk comparison)
 - Pause / resume (up button)
-- Save ruck (down button) — writes totals to persistent storage, sends activity data to phone
-- Discard (back/left button)
-- Resume in-progress session on launch: RESTORE prompt appears, accepting goes straight to the rucking screen (not the profile screen)
+- Save/Resume/Discard prompt, shown in 4 cases, each with its own item order (see `dev_docs/architecture.md` § Ruck Prompt Modes):
+  - Down button pressed: Save, Resume, Discard
+  - Back button pressed: Discard, Save, Resume
+  - App not opened for 1 minute (wakeup-scheduled check-in): Resume, Discard, Save
+  - No step-count change for 2 minutes mid-ruck (stillness check-in): Resume, Discard, Save
+  - Save writes totals to persistent storage and sends activity data to phone; Discard clears the session
+- Resume in-progress session on launch: RESTORE prompt (Resume, New) appears, accepting goes straight to the rucking screen (not the profile screen)
 - Step counting from Pebble Health, updated roughly every 10 seconds
 - Lifetime totals accumulate correctly across sessions
 - Timeline pins inserted on save (via phone companion)

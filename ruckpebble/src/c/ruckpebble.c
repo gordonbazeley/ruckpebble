@@ -1416,6 +1416,7 @@ static void prv_ruck_prompt_discard(void) {
 
 static void prv_ruck_prompt_select(void) {
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_DOWN) {
+    // Order: Save, Resume, Discard
     if (s_ruck_prompt_selected_row == 0) {
       prv_ruck_prompt_save();
     } else if (s_ruck_prompt_selected_row == 1) {
@@ -1427,6 +1428,7 @@ static void prv_ruck_prompt_select(void) {
   }
 
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) {
+    // Order: Resume, New
     if (s_ruck_prompt_selected_row == 0) {
       prv_resume_in_progress_session();
     } else {
@@ -1444,6 +1446,9 @@ static void prv_ruck_prompt_select(void) {
   }
 
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_CHECKIN) {
+    // Order: Resume, Discard, Save. CHECKIN can fire after a relaunch (no
+    // live session in memory), so resume/save first reload the persisted
+    // in-progress session.
     if (s_ruck_prompt_selected_row == 0) {
       prv_resume_in_progress_session();
       if (window_stack_contains_window(s_profile_window)) {
@@ -1462,7 +1467,7 @@ static void prv_ruck_prompt_select(void) {
     return;
   }
 
-  // RUCK_PROMPT_MODE_BACK
+  // RUCK_PROMPT_MODE_BACK. Order: Discard, Save, Resume
   if (s_ruck_prompt_selected_row == 0) {
     prv_ruck_prompt_discard();
   } else if (s_ruck_prompt_selected_row == 1) {
@@ -1525,14 +1530,16 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   const int16_t pad = 8;
   const int16_t row_w = bounds.size.w - 2 * pad;
 
-  static const char *k_titles_back[]    = { "Discard ruck", "Save ruck", "Resume ruck" };
-  static const char *k_titles_down[]    = { "Save ruck", "Resume ruck", "Discard ruck" };
-  static const char *k_titles_restore[] = { "Resume ruck", "Start new" };
-  static const char *k_titles_checkin[] = { "Resume ruck", "Discard ruck", "Save ruck" };
+  static const char *k_titles_back[]    = { "Discard", "Save", "Resume" };
+  static const char *k_titles_down[]    = { "Save", "Resume", "Discard" };
+  static const char *k_titles_restore[] = { "Resume", "New" };
+  static const char *k_titles_checkin[] = { "Resume", "Discard", "Save" };
   const char **titles;
   int row_count;
   GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
+  GFont heading_font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
   int16_t row_h = 40;
+  const int16_t heading_h = 30;
 
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_DOWN) {
     titles = k_titles_down; row_count = 3;
@@ -1547,8 +1554,13 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
 
+  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_draw_text(ctx, "RuckPebble", heading_font,
+                     GRect(pad, pad - 2, row_w, heading_h),
+                     GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+
   for (int row = 0; row < row_count; ++row) {
-    int16_t y = pad + row * (row_h + 6);
+    int16_t y = pad + heading_h + row * (row_h + 6);
     bool selected = (row == s_ruck_prompt_selected_row);
     if (selected) {
       graphics_context_set_fill_color(ctx, GColorWhite);

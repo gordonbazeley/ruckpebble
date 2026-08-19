@@ -27,12 +27,34 @@ RuckPebble is a Pebble smartwatch app for tracking rucking (weighted walking/hik
 
 ```
 s_profile_window        ← shown on launch; profile selection menu
-  └─ s_ruck_prompt_window  ← shown when pressing down from profile screen,
-                             or on restore. Modes: BACK, DOWN, RESTORE
+  └─ s_ruck_prompt_window  ← shown on down/back from the rucking screen, on
+                             restore-on-launch, or on a check-in timeout.
+                             Modes: BACK, DOWN, RESTORE, CHECKIN
        └─ s_window          ← main rucking/tracking screen
 ```
 
 On a RESTORE (in-progress session found on launch), the window stack starts as `s_profile_window → s_ruck_prompt_window`. When the user accepts resume, both are popped (profile without animation, prompt with animation) to reveal the rucking screen underneath.
+
+### Ruck Prompt Modes
+
+`s_ruck_prompt_window` is one shared `Window` + custom-drawn `Layer` (not a native `ActionMenu`/`MenuLayer` — no SDK title slot exists for this style, so the "RuckPebble" heading below is hand-drawn). One draw function, one click-config, one select function serve all 4 modes; mode only selects which title array and row→action mapping applies (`prv_ruck_prompt_layer_update_proc`, `prv_ruck_prompt_select`, `ruckpebble.c`).
+
+Every mode shows a "RuckPebble" title heading above the items. Item labels are single words (the title supplies the "ruck" context). Each mode keeps its own item order — they are **not** unified:
+
+| Mode | Trigger | Item order |
+|---|---|---|
+| DOWN | Down button pressed on the rucking screen | Save, Resume, Discard |
+| BACK | Back button pressed on the rucking screen | Discard, Save, Resume |
+| CHECKIN | App not opened for 1 min (wakeup-scheduled relaunch), or no step-count change for 2 min while foregrounded (stillness check) | Resume, Discard, Save |
+| RESTORE | In-progress session found on launch | Resume, New |
+
+CHECKIN has two distinct triggers that share one mode and one item order:
+- **1-minute app-not-opened**: on `prv_deinit` mid-session, a `wakeup_schedule` is set for `RUCK_CHECKIN_INTERVAL_S` (60s); on relaunch, if `launch_reason() == APP_LAUNCH_WAKEUP`, mode is set to CHECKIN instead of RESTORE.
+- **2-minute no-steps**: `prv_check_ruck_stillness`, polled every second from the tick handler, pushes the CHECKIN prompt once step count hasn't changed for `RUCK_STILLNESS_TIMEOUT_S` (120s) while a session is active and foregrounded.
+
+Because CHECKIN can fire right after a relaunch (no live session in memory yet), its Resume and Save actions first reload the persisted in-progress session before acting — Discard doesn't need to.
+
+Row-index meaning differs per mode (e.g. row 0 is Save in DOWN but Discard in BACK) — the default highlighted row and the physical Back-button-inside-the-prompt shortcut (`prv_ruck_prompt_resume_row`) both account for this per mode.
 
 ### Persistent Storage Keys
 
