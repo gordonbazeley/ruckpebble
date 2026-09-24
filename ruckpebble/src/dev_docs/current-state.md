@@ -17,7 +17,7 @@ Schema version: **2**
   - Down button pressed: Save, Resume, Discard
   - Back button pressed: Discard, Save, Resume
   - App not opened for 1 minute (wakeup-scheduled check-in): Resume, Discard, Save
-  - No step-count change for 2 minutes mid-ruck (stillness check-in): Resume, Discard, Save. Only when Auto pause and resume is off.
+  - No step-count change for 1 minute mid-ruck (stillness check-in): Resume, Discard, Save. Only when Auto pause and resume is off.
 - Auto pause and resume (phone setting, default on): pauses after 60s without steps (backdated to the last step), resumes after 5 new steps. Manual (Up) pauses stay paused.
   - Save writes totals to persistent storage and sends activity data to phone; Discard clears the session
 - Resume in-progress session on launch: RESTORE prompt (Resume, New) appears, accepting goes straight to the rucking screen (not the profile screen)

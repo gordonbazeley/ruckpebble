@@ -14,8 +14,7 @@
 #define RUCK_CHECKIN_INTERVAL_S 60
 #define RUCK_CHECKIN_REPEAT_MS 30000
 #define RUCK_CHECKIN_REPEAT_TIMEOUT_S 180
-#define RUCK_STILLNESS_TIMEOUT_S 120
-#define RUCK_AUTO_PAUSE_TIMEOUT_S 60
+#define RUCK_STILLNESS_TIMEOUT_S 60
 #define RUCK_AUTO_RESUME_MIN_STEPS 5  // ignore fidgets while auto-paused
 
 typedef struct {
@@ -968,8 +967,7 @@ static void prv_check_ruck_stillness(time_t now) {
     s_last_movement_time = now;
     return;
   }
-  int32_t timeout_s = s_settings.auto_pause_enabled ? RUCK_AUTO_PAUSE_TIMEOUT_S : RUCK_STILLNESS_TIMEOUT_S;
-  if ((now - s_last_movement_time) < timeout_s) {
+  if ((now - s_last_movement_time) < RUCK_STILLNESS_TIMEOUT_S) {
     return;
   }
   if (window_stack_contains_window(s_ruck_prompt_window)) {

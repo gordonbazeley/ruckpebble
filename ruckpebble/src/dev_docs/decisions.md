@@ -126,7 +126,7 @@ Decisions that aren't obvious from the code, with the reasoning behind them.
 
 ## Auto pause replaces the stillness prompt by default
 
-**Decision:** With `auto_pause_enabled` on (default), 60s without steps auto-pauses the session instead of showing the CHECKIN prompt. The pause start is backdated to the last detected step, and it auto-resumes after 5 new steps. A pause the user started with Up is never auto-resumed.
+**Decision:** With `auto_pause_enabled` on (default), 60s without steps auto-pauses the session instead of showing the CHECKIN prompt. The pause start is backdated to the last detected step, and it auto-resumes after 5 new steps. A pause the user started with Up is never auto-resumed. When off, the CHECKIN prompt fires after the same 60s.
 
 **Why:** Stopping mid-ruck (traffic, water, a chat) shouldn't need a button press twice, and the idle minute shouldn't count toward duration or pace. The 5-step threshold avoids resuming on a fidget. Manual pauses are an explicit intent, so movement doesn't override them.
 
