@@ -45,12 +45,15 @@ Every mode shows a "RuckPebble" title heading above the items. Item labels are s
 |---|---|---|
 | DOWN | Down button pressed on the rucking screen | Save, Resume, Discard |
 | BACK | Back button pressed on the rucking screen | Discard, Save, Resume |
-| CHECKIN | App not opened for 1 min (wakeup-scheduled relaunch), or no step-count change for 2 min while foregrounded (stillness check) | Resume, Discard, Save |
+| CHECKIN | App not opened for 1 min (wakeup-scheduled relaunch), or no step-count change for 2 min while foregrounded (stillness check, only when the Auto pause and resume setting is off) | Resume, Discard, Save |
 | RESTORE | In-progress session found on launch | Resume, New |
 
 CHECKIN has two distinct triggers that share one mode and one item order:
 - **1-minute app-not-opened**: on `prv_deinit` mid-session, a `wakeup_schedule` is set for `RUCK_CHECKIN_INTERVAL_S` (60s); on relaunch, if `launch_reason() == APP_LAUNCH_WAKEUP`, mode is set to CHECKIN instead of RESTORE.
-- **2-minute no-steps**: `prv_check_ruck_stillness`, polled every second from the tick handler, pushes the CHECKIN prompt once step count hasn't changed for `RUCK_STILLNESS_TIMEOUT_S` (120s) while a session is active and foregrounded.
+- **2-minute no-steps**: `prv_check_ruck_stillness`, polled every second from the tick handler, pushes the CHECKIN prompt once step count hasn't changed for `RUCK_STILLNESS_TIMEOUT_S` (120s) while a session is active and foregrounded. This only happens when `auto_pause_enabled` is off.
+
+### Auto pause and resume
+`auto_pause_enabled` (phone setting, default on) replaces the 2-minute CHECKIN. `prv_check_ruck_stillness` auto-pauses after `RUCK_AUTO_PAUSE_TIMEOUT_S` (60s) of no steps via `prv_pause_session(now, s_last_movement_time)`, so the pause is backdated to the last step. While `s_auto_paused`, it compares live health steps against `s_steps_at_pause` and calls `prv_resume_session` once `RUCK_AUTO_RESUME_MIN_STEPS` (5) new steps appear. The Up button uses the same two functions; a manual pause leaves `s_auto_paused` false and is never auto-resumed. Both transitions give a short vibe.
 
 Because CHECKIN can fire right after a relaunch (no live session in memory yet), its Resume and Save actions first reload the persisted in-progress session before acting — Discard doesn't need to.
 

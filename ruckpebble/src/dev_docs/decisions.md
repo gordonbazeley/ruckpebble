@@ -121,3 +121,13 @@ Decisions that aren't obvious from the code, with the reasoning behind them.
 **Decision:** When `Pebble.openURL()` fires with an `https://` URL (the production GitHub Pages URL), `open_config.js` reads `docs/config.html` from disk rather than fetching it over the network.
 
 **Why:** The developer can test settings changes against their local `config.html` without deploying to GitHub Pages first. The script injects `return_to` pointing to its local HTTP server so saves still round-trip correctly through the mock environment.
+
+---
+
+## Auto pause replaces the stillness prompt by default
+
+**Decision:** With `auto_pause_enabled` on (default), 60s without steps auto-pauses the session instead of showing the CHECKIN prompt. The pause start is backdated to the last detected step, and it auto-resumes after 5 new steps. A pause the user started with Up is never auto-resumed.
+
+**Why:** Stopping mid-ruck (traffic, water, a chat) shouldn't need a button press twice, and the idle minute shouldn't count toward duration or pace. The 5-step threshold avoids resuming on a fidget. Manual pauses are an explicit intent, so movement doesn't override them.
+
+**Storage:** `auto_pause_enabled` is appended as the last `Settings` field so older, shorter persisted blobs load with the default; `APP_STATE_SCHEMA_VERSION` was not bumped because that wipes lifetime totals.

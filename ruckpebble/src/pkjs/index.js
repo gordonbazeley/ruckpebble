@@ -18,6 +18,7 @@
     stride_length_unit: 0,
     measurement_unit: 0,
     ruck_weight_unit: 1,
+    auto_pause_enabled: 1,
 
     profile1_ruck_weight_value: 136,
     profile1_terrain_factor: 100,
@@ -129,6 +130,7 @@
     out.profile2_ruck_weight_value = parseInt(out.profile2_ruck_weight_value, 10) || 0;
     out.profile3_ruck_weight_value = parseInt(out.profile3_ruck_weight_value, 10) || 0;
     var rwu = parseInt(out.ruck_weight_unit, 10); out.ruck_weight_unit = isNaN(rwu) ? 1 : rwu;
+    out.auto_pause_enabled = parseInt(out.auto_pause_enabled, 10) === 0 ? 0 : 1;
     out.weight_unit = out.measurement_unit;
     out.stride_length_unit = out.measurement_unit;
     out.lifetime_distance_m_total = parseInt(out.lifetime_distance_m_total, 10) || 0;
@@ -149,10 +151,10 @@
     // from phone→watch messages.
     var watchMsg = {
       weight_value:              normalized.weight_value,
-      measurement_unit:          normalized.measurement_unit,
       weight_unit:               0,
       stride_length_value:       normalized.stride_length_value,
       stride_length_unit:        0,
+      auto_pause_enabled:        normalized.auto_pause_enabled,
       profile1_ruck_weight_value: normalized.profile1_ruck_weight_value,
       profile1_terrain_factor:   normalized.profile1_terrain_factor,
       profile1_terrain_type:     normalized.profile1_terrain_type,

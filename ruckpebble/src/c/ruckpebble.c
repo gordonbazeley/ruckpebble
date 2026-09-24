@@ -15,6 +15,8 @@
 #define RUCK_CHECKIN_REPEAT_MS 30000
 #define RUCK_CHECKIN_REPEAT_TIMEOUT_S 180
 #define RUCK_STILLNESS_TIMEOUT_S 120
+#define RUCK_AUTO_PAUSE_TIMEOUT_S 60
+#define RUCK_AUTO_RESUME_MIN_STEPS 5  // ignore fidgets while auto-paused
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -34,6 +36,8 @@ typedef struct {
   ProfileSettings profiles[PROFILE_COUNT];
   char profile_names[PROFILE_COUNT][PROFILE_NAME_MAX_LEN];
   char profile_terrain_types[PROFILE_COUNT][TERRAIN_TYPE_MAX_LEN];
+  // Appended last so older, shorter persisted blobs keep this default on load.
+  int32_t auto_pause_enabled; // 0/1
 } Settings;
 
 typedef enum {
@@ -87,7 +91,8 @@ static const Settings SETTINGS_DEFAULTS = {
     "road",
     "road",
     "gravel"
-  }
+  },
+  .auto_pause_enabled = 1
 };
 
 static Window *s_profile_window;
@@ -151,6 +156,7 @@ static int32_t s_session_distance_offset_m = 0;
 static int32_t s_session_steps = 0;
 static int32_t s_session_steps_offset = 0;
 static bool s_session_paused = false;
+static bool s_auto_paused = false;
 static time_t s_pause_start_time = 0;
 static int32_t s_pause_total_s = 0;
 static int32_t s_steps_at_pause = 0;
@@ -908,8 +914,49 @@ static void prv_update_display(void) {
   }
 }
 
+// Session steps as the health service sees them right now, ignoring the pause freeze.
+static int32_t prv_live_session_steps(time_t now) {
+  int32_t steps_since_baseline = prv_current_step_count(now) - s_steps_baseline;
+  if (steps_since_baseline < 0) {
+    steps_since_baseline = 0;
+  }
+  return s_session_steps_offset + steps_since_baseline;
+}
+
+// pause_start may be backdated (auto-pause) so the idle period isn't counted.
+static void prv_pause_session(time_t now, time_t pause_start) {
+  s_pause_start_time = pause_start;
+  s_steps_at_pause = prv_live_session_steps(now);
+  s_session_paused = true;
+}
+
+static void prv_resume_session(time_t now) {
+  s_pause_total_s += (int32_t)(now - s_pause_start_time);
+  int32_t steps_since_baseline_at_pause = s_steps_at_pause - s_session_steps_offset;
+  if (steps_since_baseline_at_pause < 0) {
+    steps_since_baseline_at_pause = 0;
+  }
+  s_steps_baseline = prv_current_step_count(now) - steps_since_baseline_at_pause;
+  s_last_time = 0;
+  s_session_paused = false;
+  s_auto_paused = false;
+  s_steps_at_last_movement = s_session_steps;
+  s_last_movement_time = now;
+}
+
 static void prv_check_ruck_stillness(time_t now) {
-  if (!s_session_active || s_session_paused || !s_health_available) {
+  if (!s_session_active || !s_health_available) {
+    return;
+  }
+  if (s_session_paused) {
+    // Manual pauses (Up button) are never auto-resumed.
+    if (s_auto_paused &&
+        prv_live_session_steps(now) - s_steps_at_pause >= RUCK_AUTO_RESUME_MIN_STEPS) {
+      APP_LOG(APP_LOG_LEVEL_INFO, "Auto-resume: movement detected");
+      prv_resume_session(now);
+      vibes_short_pulse();
+      prv_update_display();
+    }
     return;
   }
   if (s_session_steps != s_steps_at_last_movement) {
@@ -921,10 +968,19 @@ static void prv_check_ruck_stillness(time_t now) {
     s_last_movement_time = now;
     return;
   }
-  if ((now - s_last_movement_time) < RUCK_STILLNESS_TIMEOUT_S) {
+  int32_t timeout_s = s_settings.auto_pause_enabled ? RUCK_AUTO_PAUSE_TIMEOUT_S : RUCK_STILLNESS_TIMEOUT_S;
+  if ((now - s_last_movement_time) < timeout_s) {
     return;
   }
   if (window_stack_contains_window(s_ruck_prompt_window)) {
+    return;
+  }
+  if (s_settings.auto_pause_enabled) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "Auto-pause: no steps for %lds", (long)(now - s_last_movement_time));
+    prv_pause_session(now, s_last_movement_time);
+    s_auto_paused = true;
+    vibes_short_pulse();
+    prv_update_display();
     return;
   }
   s_ruck_prompt_mode = RUCK_PROMPT_MODE_CHECKIN;
@@ -1049,6 +1105,11 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     s_settings.sim_steps_enabled = t->value->int32;
     APP_LOG(APP_LOG_LEVEL_INFO, "sim_steps_enabled set to %ld", (long)s_settings.sim_steps_enabled);
   }
+  t = dict_find(iter, MESSAGE_KEY_auto_pause_enabled);
+  if (t) {
+    s_settings.auto_pause_enabled = t->value->int32 ? 1 : 0;
+    APP_LOG(APP_LOG_LEVEL_INFO, "auto_pause_enabled set to %ld", (long)s_settings.auto_pause_enabled);
+  }
   t = dict_find(iter, MESSAGE_KEY_sim_steps_spm);
   if (t) {
     s_settings.sim_steps_spm = t->value->int32;
@@ -1117,6 +1178,7 @@ static void prv_reset_session_state(void) {
   s_session_steps = 0;
   s_session_steps_offset = 0;
   s_session_paused = false;
+  s_auto_paused = false;
   s_pause_start_time = 0;
   s_pause_total_s = 0;
   s_steps_at_pause = 0;
@@ -1725,24 +1787,9 @@ static void prv_main_up_click_handler(ClickRecognizerRef recognizer, void *conte
   if (!s_session_active) return;
   time_t now = time(NULL);
   if (s_session_paused) {
-    s_pause_total_s += (int32_t)(now - s_pause_start_time);
-    int32_t steps_since_baseline_at_pause = s_steps_at_pause - s_session_steps_offset;
-    if (steps_since_baseline_at_pause < 0) {
-      steps_since_baseline_at_pause = 0;
-    }
-    s_steps_baseline = prv_current_step_count(now) - steps_since_baseline_at_pause;
-    s_last_time = 0;
-    s_session_paused = false;
-    s_steps_at_last_movement = s_session_steps;
-    s_last_movement_time = now;
+    prv_resume_session(now);
   } else {
-    s_pause_start_time = now;
-    int32_t steps_since_baseline = prv_current_step_count(now) - s_steps_baseline;
-    if (steps_since_baseline < 0) {
-      steps_since_baseline = 0;
-    }
-    s_steps_at_pause = s_session_steps_offset + steps_since_baseline;
-    s_session_paused = true;
+    prv_pause_session(now, now);
   }
   prv_update_display();
 }
