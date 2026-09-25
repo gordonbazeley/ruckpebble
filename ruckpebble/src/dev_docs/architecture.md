@@ -43,19 +43,27 @@ Every mode shows a "RuckPebble" title heading above the items. Item labels are s
 
 | Mode | Trigger | Item order |
 |---|---|---|
-| DOWN | Down button pressed on the rucking screen | Save, Resume, Discard |
+| DOWN | Down button pressed on the rucking screen | Save, Watch, Discard |
 | BACK | Back button pressed on the rucking screen | Discard, Save, Resume |
-| CHECKIN | App not opened for 1 min (wakeup-scheduled relaunch), or no step-count change for 1 min while foregrounded (stillness check, only when the Auto pause and resume setting is off) | Resume, Discard, Save |
+| CHECKIN | App not opened for 1 min (wakeup-scheduled relaunch, only when auto pause is off), or no step-count change for 1 min while foregrounded (stillness check, only when the Auto pause and resume setting is off) | Resume, Discard, Save |
 | RESTORE | In-progress session found on launch | Resume, New |
 
 CHECKIN has two distinct triggers that share one mode and one item order:
-- **1-minute app-not-opened**: on `prv_deinit` mid-session, a `wakeup_schedule` is set for `RUCK_CHECKIN_INTERVAL_S` (60s); on relaunch, if `launch_reason() == APP_LAUNCH_WAKEUP`, mode is set to CHECKIN instead of RESTORE.
+- **1-minute app-not-opened**: on `prv_deinit` mid-session, a `wakeup_schedule` is set for `RUCK_CHECKIN_INTERVAL_S` (60s); on relaunch, if `launch_reason() == APP_LAUNCH_WAKEUP`, mode is set to CHECKIN instead of RESTORE. With `auto_pause_enabled` on, a wakeup relaunch skips the prompt entirely: `prv_init` resumes the session and shows the rucking screen with a short vibe.
 - **1-minute no-steps**: `prv_check_ruck_stillness`, polled every second from the tick handler, pushes the CHECKIN prompt once step count hasn't changed for `RUCK_STILLNESS_TIMEOUT_S` (60s) while a session is active and foregrounded. This only happens when `auto_pause_enabled` is off.
 
 ### Auto pause and resume
 `auto_pause_enabled` (phone setting, default on) replaces the 1-minute CHECKIN. `prv_check_ruck_stillness` auto-pauses after the same `RUCK_STILLNESS_TIMEOUT_S` (60s) of no steps via `prv_pause_session(now, s_last_movement_time)`, so the pause is backdated to the last step. While `s_auto_paused`, it compares live health steps against `s_steps_at_pause` and calls `prv_resume_session` once `RUCK_AUTO_RESUME_MIN_STEPS` (5) new steps appear. The Up button uses the same two functions; a manual pause leaves `s_auto_paused` false and is never auto-resumed. Both transitions give a short vibe.
 
-Because CHECKIN can fire right after a relaunch (no live session in memory yet), its Resume and Save actions first reload the persisted in-progress session before acting — Discard doesn't need to.
+Because CHECKIN can fire right after a relaunch (no live session in memory yet), its Resume and Save actions reload the persisted in-progress session first, but only when `s_session_active` is false; a stillness CHECKIN keeps the live session.
+
+### Time away from the app
+`prv_save_in_progress_session` also stores the save time, the health day step total, and whether the user paused manually. `prv_resume_in_progress_session` treats the gap since that save as active, adding its steps and time, only if at least `RUCK_AUTO_RESUME_MIN_STEPS` steps were taken during it on the same day. Otherwise the gap counts as paused. A manual pause is restored as paused. The gap is all-or-nothing (walk-then-sit counts in full).
+
+### What's new pop-up
+`prv_maybe_show_whats_new` shows `WHATS_NEW_TEXT` (scrollable, OK button at the end; Select or Back dismisses) once, on the first non-wakeup launch after an update, when the stored `WHATS_NEW_SEEN_PERSIST_KEY` < `WHATS_NEW_ID`. Fresh installs (no schema-version key yet) record the ID without showing it. To announce a release, bump `WHATS_NEW_ID` and edit the text.
+
+DOWN's **Watch** row calls `window_stack_pop_all` so the user drops to the watchface; `prv_deinit` persists the session and schedules the 1-minute wakeup. DOWN has no Resume row, so Back inside the DOWN prompt just closes it.
 
 Row-index meaning differs per mode (e.g. row 0 is Save in DOWN but Discard in BACK) — the default highlighted row and the physical Back-button-inside-the-prompt shortcut (`prv_ruck_prompt_resume_row`) both account for this per mode.
 

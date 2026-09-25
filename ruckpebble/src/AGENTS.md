@@ -19,6 +19,7 @@ You have my permissions to always run commands that start with pebble
 - `./scripts/emu-logs.sh`: Preferred logs command for config debugging (includes pypkjs output).
 - `pebble emu-app-config --emulator emery`: Open emulator app config in the default browser (Safari).
 - After every successful `pebble build`, always run `pebble install --emulator emery`.
+- Every successful `pebble build` also copies `build/ruckpebble.pbw` to `~/Nextcloud/pbws/` (post-build hook in `wscript`; skipped if that folder doesn't exist).
 
 ## Runbook (Commands To Run)
 - "rs" - run the emulator and settings

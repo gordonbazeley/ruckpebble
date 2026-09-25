@@ -63,7 +63,16 @@ enum {
   SESSION_RESUME_ELAPSED_S_PERSIST_KEY = 14,
   SESSION_RESUME_PROFILE_PERSIST_KEY   = 15,
   SESSION_RESUME_STEPS_PERSIST_KEY     = 16,
+  SESSION_RESUME_SAVED_AT_PERSIST_KEY  = 17,
+  SESSION_RESUME_DAY_STEPS_PERSIST_KEY = 18,
+  SESSION_RESUME_PAUSED_PERSIST_KEY    = 19,  // 1 = manually paused
+  WHATS_NEW_SEEN_PERSIST_KEY           = 20,
 };
+
+// Bump WHATS_NEW_ID (and edit the text) to show the pop-up once after an update.
+#define WHATS_NEW_ID 1
+#define WHATS_NEW_TEXT "Auto pause & resume when you stop and start moving.\n\nDown > Watch leaves your ruck running.\n\nFull release notes in the Pebble app store."
+
 
 #define APP_STATE_SCHEMA_VERSION 2
 
@@ -217,6 +226,7 @@ static void prv_show_status_message(const char *text, uint32_t duration_ms);
 static void prv_health_handler(HealthEventType event, void *context);
 static void prv_reset_session_state(void);
 static void prv_save_ruck(void);
+static void prv_pause_session(time_t now, time_t pause_start);
 
 static bool prv_step_count_available(time_t now) {
   HealthServiceAccessibilityMask access = health_service_metric_accessible(HealthMetricStepCount, s_day_start, now);
@@ -501,6 +511,9 @@ static void prv_save_in_progress_session(void) {
   persist_write_int(SESSION_RESUME_CALORIES_PERSIST_KEY, s_session_calories);
   persist_write_int(SESSION_RESUME_STEPS_PERSIST_KEY, s_session_steps);
   persist_write_int(SESSION_RESUME_PROFILE_PERSIST_KEY, (int32_t)s_settings.active_profile);
+  persist_write_int(SESSION_RESUME_SAVED_AT_PERSIST_KEY, (int32_t)now);
+  persist_write_int(SESSION_RESUME_DAY_STEPS_PERSIST_KEY, prv_current_step_count(now));
+  persist_write_int(SESSION_RESUME_PAUSED_PERSIST_KEY, (s_session_paused && !s_auto_paused) ? 1 : 0);
 }
 
 static void prv_clear_in_progress_session(void) {
@@ -538,16 +551,43 @@ static void prv_resume_in_progress_session(void) {
   }
   s_session_steps = s_session_steps_offset;
 
-  s_start_time = now - (time_t)saved_elapsed_s;
-  s_session_active = true;
-
   prv_ensure_health_subscription(now);
-  s_steps_baseline = s_health_available ? prv_current_step_count(now) : 0;
+  int32_t day_steps = s_health_available ? prv_current_step_count(now) : 0;
+  s_steps_baseline = day_steps;
+
+  // Time away from the app (watchface, notification kill) counts only if the
+  // user kept moving: gap steps are added and the gap counts as active time.
+  // Otherwise the gap is treated as paused. Same-day only - health day totals
+  // reset at midnight. A manual pause carries over as-is.
+  // ponytail: all-or-nothing gap; per-minute health history would split walk-then-sit gaps.
+  time_t saved_at = persist_exists(SESSION_RESUME_SAVED_AT_PERSIST_KEY) ?
+      (time_t)persist_read_int(SESSION_RESUME_SAVED_AT_PERSIST_KEY) : 0;
+  bool manually_paused = persist_exists(SESSION_RESUME_PAUSED_PERSIST_KEY) &&
+      persist_read_int(SESSION_RESUME_PAUSED_PERSIST_KEY) == 1;
+  int32_t gap_s = 0;
+  int32_t gap_steps = 0;
+  if (!manually_paused && s_health_available && saved_at >= s_day_start && saved_at < now &&
+      persist_exists(SESSION_RESUME_DAY_STEPS_PERSIST_KEY)) {
+    gap_steps = day_steps - persist_read_int(SESSION_RESUME_DAY_STEPS_PERSIST_KEY);
+    if (gap_steps >= RUCK_AUTO_RESUME_MIN_STEPS) {
+      gap_s = (int32_t)(now - saved_at);
+      s_steps_baseline = day_steps - gap_steps;
+    } else {
+      gap_steps = 0;
+    }
+  }
+
+  s_start_time = now - (time_t)(saved_elapsed_s + gap_s);
+  s_session_active = true;
   s_steps_at_last_movement = s_session_steps;
   s_last_movement_time = now;
+  if (manually_paused) {
+    prv_pause_session(now, now);
+  }
 
-  APP_LOG(APP_LOG_LEVEL_INFO, "Resumed session: elapsed=%lds dist_offset=%ldm steps_offset=%ld",
-          (long)saved_elapsed_s, (long)s_session_distance_offset_m, (long)s_session_steps_offset);
+  APP_LOG(APP_LOG_LEVEL_INFO, "Resumed session: elapsed=%lds gap=%lds gap_steps=%ld paused=%d dist_offset=%ldm steps_offset=%ld",
+          (long)saved_elapsed_s, (long)gap_s, (long)gap_steps, (int)manually_paused,
+          (long)s_session_distance_offset_m, (long)s_session_steps_offset);
 }
 
 static void prv_load_settings(void) {
@@ -1476,11 +1516,12 @@ static void prv_ruck_prompt_discard(void) {
 
 static void prv_ruck_prompt_select(void) {
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_DOWN) {
-    // Order: Save, Resume, Discard
+    // Order: Save, Watch, Discard. Watch exits to the watchface; deinit
+    // persists the session and the 1-minute wakeup brings the app back.
     if (s_ruck_prompt_selected_row == 0) {
       prv_ruck_prompt_save();
     } else if (s_ruck_prompt_selected_row == 1) {
-      prv_ruck_prompt_resume();
+      window_stack_pop_all(true);
     } else {
       prv_ruck_prompt_discard();
     }
@@ -1510,7 +1551,9 @@ static void prv_ruck_prompt_select(void) {
     // live session in memory), so resume/save first reload the persisted
     // in-progress session.
     if (s_ruck_prompt_selected_row == 0) {
-      prv_resume_in_progress_session();
+      if (!s_session_active) {
+        prv_resume_in_progress_session();
+      }
       if (window_stack_contains_window(s_profile_window)) {
         window_stack_remove(s_profile_window, false);
       }
@@ -1521,7 +1564,9 @@ static void prv_ruck_prompt_select(void) {
     } else if (s_ruck_prompt_selected_row == 1) {
       prv_ruck_prompt_discard();
     } else {
-      prv_resume_in_progress_session();
+      if (!s_session_active) {
+        prv_resume_in_progress_session();
+      }
       prv_ruck_prompt_save();
     }
     return;
@@ -1564,7 +1609,6 @@ static void prv_ruck_prompt_select_click_handler(ClickRecognizerRef recognizer, 
 
 static int32_t prv_ruck_prompt_resume_row(RuckPromptMode mode) {
   switch (mode) {
-    case RUCK_PROMPT_MODE_DOWN: return 1;
     case RUCK_PROMPT_MODE_BACK: return 2;
     default: return 0; // RESTORE, CHECKIN
   }
@@ -1573,6 +1617,11 @@ static int32_t prv_ruck_prompt_resume_row(RuckPromptMode mode) {
 static void prv_ruck_prompt_back_click_handler(ClickRecognizerRef recognizer, void *context) {
   (void)recognizer;
   (void)context;
+  if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_DOWN) {
+    // DOWN has no Resume row; Back just closes the menu.
+    prv_ruck_prompt_resume();
+    return;
+  }
   s_ruck_prompt_selected_row = prv_ruck_prompt_resume_row(s_ruck_prompt_mode);
   prv_ruck_prompt_select();
 }
@@ -1591,7 +1640,7 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   const int16_t row_w = bounds.size.w - 2 * pad;
 
   static const char *k_titles_back[]    = { "Discard", "Save", "Resume" };
-  static const char *k_titles_down[]    = { "Save", "Resume", "Discard" };
+  static const char *k_titles_down[]    = { "Save", "Watch", "Discard" };
   static const char *k_titles_restore[] = { "Resume", "New" };
   static const char *k_titles_checkin[] = { "Resume", "Discard", "Save" };
   const char **titles;
@@ -2000,6 +2049,110 @@ static void prv_window_unload(Window *window) {
   s_paused_icon_layer = NULL;
 }
 
+static Window *s_whats_new_window;
+static ScrollLayer *s_whats_new_scroll_layer;
+static TextLayer *s_whats_new_title_layer;
+static TextLayer *s_whats_new_body_layer;
+static Layer *s_whats_new_ok_layer;
+
+static void prv_whats_new_click_handler(ClickRecognizerRef recognizer, void *context) {
+  (void)recognizer;
+  (void)context;
+  window_stack_remove(s_whats_new_window, true);
+}
+
+// Up/Down scroll (ScrollLayer's own handlers); Select = OK.
+static void prv_whats_new_click_config_provider(void *context) {
+  (void)context;
+  window_single_click_subscribe(BUTTON_ID_SELECT, prv_whats_new_click_handler);
+}
+
+static void prv_whats_new_ok_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, bounds, 4, GCornersAll);
+  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_draw_text(ctx, "OK", fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD),
+                     GRect(0, 2, bounds.size.w, bounds.size.h - 4),
+                     GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+}
+
+static void prv_whats_new_window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+  const int16_t inset = PBL_IF_ROUND_ELSE(34, 8);
+  const int16_t top = PBL_IF_ROUND_ELSE(20, 4);
+  const int16_t w = bounds.size.w - 2 * inset;
+  const int16_t title_h = 34;
+  const int16_t ok_h = 40;
+
+  s_whats_new_scroll_layer = scroll_layer_create(bounds);
+  scroll_layer_set_shadow_hidden(s_whats_new_scroll_layer, true);
+  scroll_layer_set_click_config_onto_window(s_whats_new_scroll_layer, window);
+  scroll_layer_set_callbacks(s_whats_new_scroll_layer, (ScrollLayerCallbacks) {
+    .click_config_provider = prv_whats_new_click_config_provider,
+  });
+  layer_add_child(window_layer, scroll_layer_get_layer(s_whats_new_scroll_layer));
+
+  s_whats_new_title_layer = text_layer_create(GRect(inset, top, w, title_h));
+  text_layer_set_text(s_whats_new_title_layer, "What's new");
+  text_layer_set_font(s_whats_new_title_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+  text_layer_set_text_alignment(s_whats_new_title_layer, GTextAlignmentCenter);
+  text_layer_set_background_color(s_whats_new_title_layer, GColorClear);
+  text_layer_set_text_color(s_whats_new_title_layer, GColorWhite);
+  scroll_layer_add_child(s_whats_new_scroll_layer, text_layer_get_layer(s_whats_new_title_layer));
+
+  int16_t body_y = top + title_h;
+  s_whats_new_body_layer = text_layer_create(GRect(inset, body_y, w, 2000));
+  text_layer_set_text(s_whats_new_body_layer, WHATS_NEW_TEXT);
+  text_layer_set_font(s_whats_new_body_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28));
+  text_layer_set_text_alignment(s_whats_new_body_layer, GTextAlignmentCenter);
+  text_layer_set_overflow_mode(s_whats_new_body_layer, GTextOverflowModeWordWrap);
+  text_layer_set_background_color(s_whats_new_body_layer, GColorClear);
+  text_layer_set_text_color(s_whats_new_body_layer, GColorWhite);
+  int16_t body_h = text_layer_get_content_size(s_whats_new_body_layer).h + 8;
+  layer_set_frame(text_layer_get_layer(s_whats_new_body_layer), GRect(inset, body_y, w, body_h));
+  scroll_layer_add_child(s_whats_new_scroll_layer, text_layer_get_layer(s_whats_new_body_layer));
+
+  int16_t ok_y = body_y + body_h + 4;
+  const int16_t ok_w = PBL_IF_ROUND_ELSE(100, w);
+  s_whats_new_ok_layer = layer_create(GRect((bounds.size.w - ok_w) / 2, ok_y, ok_w, ok_h));
+  layer_set_update_proc(s_whats_new_ok_layer, prv_whats_new_ok_update_proc);
+  scroll_layer_add_child(s_whats_new_scroll_layer, s_whats_new_ok_layer);
+
+  scroll_layer_set_content_size(s_whats_new_scroll_layer,
+                                GSize(bounds.size.w, ok_y + ok_h + PBL_IF_ROUND_ELSE(24, 8)));
+}
+
+static void prv_whats_new_window_unload(Window *window) {
+  (void)window;
+  text_layer_destroy(s_whats_new_title_layer);
+  text_layer_destroy(s_whats_new_body_layer);
+  layer_destroy(s_whats_new_ok_layer);
+  scroll_layer_destroy(s_whats_new_scroll_layer);
+  window_destroy(s_whats_new_window);
+  s_whats_new_window = NULL;
+}
+
+// Shown once per WHATS_NEW_ID on existing installs; fresh installs just record it.
+static void prv_maybe_show_whats_new(bool existing_install) {
+  int32_t seen = persist_exists(WHATS_NEW_SEEN_PERSIST_KEY) ? persist_read_int(WHATS_NEW_SEEN_PERSIST_KEY) : 0;
+  if (seen >= WHATS_NEW_ID) {
+    return;
+  }
+  persist_write_int(WHATS_NEW_SEEN_PERSIST_KEY, WHATS_NEW_ID);
+  if (!existing_install) {
+    return;
+  }
+  s_whats_new_window = window_create();
+  window_set_background_color(s_whats_new_window, GColorBlack);
+  window_set_window_handlers(s_whats_new_window, (WindowHandlers) {
+    .load = prv_whats_new_window_load,
+    .unload = prv_whats_new_window_unload,
+  });
+  window_stack_push(s_whats_new_window, true);
+}
+
 static void prv_schedule_checkin_wakeup(void) {
   WakeupId id = wakeup_schedule(time(NULL) + RUCK_CHECKIN_INTERVAL_S, 0, true);
   if (id < 0) {
@@ -2012,6 +2165,8 @@ static void prv_init(void) {
   wakeup_cancel_all();
 
   prv_load_settings();
+  // Schema key is written on first launch, so its presence means this is an update.
+  bool existing_install = persist_exists(APP_STATE_SCHEMA_VERSION_PERSIST_KEY);
   if (persist_exists(APP_STATE_SCHEMA_VERSION_PERSIST_KEY)) {
     int32_t stored_version = persist_read_int(APP_STATE_SCHEMA_VERSION_PERSIST_KEY);
     if (stored_version != APP_STATE_SCHEMA_VERSION) {
@@ -2103,19 +2258,33 @@ static void prv_init(void) {
   APP_LOG(APP_LOG_LEVEL_INFO, "App initialized, waiting for config updates");
 
   window_stack_push(s_window, false);
+
+  // Wakeup relaunch (user left via Watch or the app was killed) with auto
+  // pause on: go straight back to the ruck; auto pause/resume handles stillness.
+  bool resumable = prv_has_resumable_session_for_profile(prv_active_profile_index());
+  if (resumable && launch_reason_val == APP_LAUNCH_WAKEUP && s_settings.auto_pause_enabled) {
+    prv_resume_in_progress_session();
+    prv_update_display();
+    vibes_short_pulse();
+    return;
+  }
+
   window_stack_push(s_profile_window, true);
 
   // If the app was killed mid-session (e.g. by a notification), jump straight
   // to the restore prompt rather than leaving the user on the profile screen.
   // A wakeup relaunch gets the "still rucking?" check-in prompt instead of
   // the restore prompt so the user can end the ruck without fully resuming it.
-  if (prv_has_resumable_session_for_profile(prv_active_profile_index())) {
+  if (resumable) {
     s_ruck_prompt_mode = (launch_reason_val == APP_LAUNCH_WAKEUP) ?
         RUCK_PROMPT_MODE_CHECKIN : RUCK_PROMPT_MODE_RESTORE;
     window_stack_push(s_ruck_prompt_window, true);
     if (launch_reason_val == APP_LAUNCH_WAKEUP) {
       vibes_double_pulse();
     }
+  }
+  if (launch_reason_val != APP_LAUNCH_WAKEUP) {
+    prv_maybe_show_whats_new(existing_install);
   }
 }
 

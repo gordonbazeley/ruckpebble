@@ -4,6 +4,7 @@
 # Feel free to customize this to your needs.
 #
 import os.path
+import shutil
 
 top = '.'
 out = 'build'
@@ -52,3 +53,14 @@ def build(ctx):
                                          'src/pkjs/**/*.json',
                                          'src/common/**/*.js']),
                    js_entry_file='src/pkjs/index.js')
+
+    ctx.add_post_fun(_copy_pbw_to_nextcloud)
+
+
+# Drop every successful build into Nextcloud for sideloading; skipped on machines without it.
+def _copy_pbw_to_nextcloud(ctx):
+    dest = os.path.expanduser('~/Nextcloud/pbws')
+    pbw = os.path.join(out, 'ruckpebble.pbw')
+    if os.path.isdir(dest) and os.path.exists(pbw):
+        shutil.copy(pbw, dest)
+        print('Copied {} to {}'.format(pbw, dest))
