@@ -11,9 +11,9 @@ Schema version: **2**
 
 ### Watch app (C)
 - Profile selection screen with up to 3 profiles; touch selects profile, centre button starts ruck
-- Rucking screen shows: profile name, session pace, current pace (60s rolling), steps (session + today), current time, distance, heart rate, elapsed time, calories (ruck + walk comparison)
+- Rucking screen shows: profile name, session pace, current pace (60s rolling), steps (session + today), current time, distance, heart rate, elapsed time, calories (ruck + walk comparison). Button-only (Up pause/resume, Down/Back menus) — no touch, to avoid accidental touches from sweat/rain during a ruck.
 - Pause / resume (up button)
-- Save/Resume/Discard prompt, shown in 4 cases, each with its own item order (see `dev_docs/architecture.md` § Ruck Prompt Modes):
+- Save/Resume/Discard prompt, shown in 4 cases, each with its own item order (see `dev_docs/architecture.md` § Ruck Prompt Modes) — buttons or tap a row:
   - Down button pressed: Watch (exit to watchface, ruck keeps going), Save, Discard
   - Back button pressed: Discard, Save, Resume
   - App not opened for 1 minute (wakeup-scheduled check-in): Resume, Discard, Save. With auto pause on, the wakeup goes straight back to the ruck screen instead.
@@ -21,7 +21,7 @@ Schema version: **2**
 - Auto pause and resume (phone setting, default on): pauses after 60s without steps (backdated to the last step), resumes after 5 new steps. Manual (Up) pauses stay paused.
   - Save writes totals to persistent storage and sends activity data to phone; Discard clears the session
 - Time away from the app counts as active only if you took 5+ steps during it (same day); otherwise it's treated as paused
-- One-time "What's new" pop-up on the first launch after an update (`WHATS_NEW_ID`)
+- One-time "What's new" pop-up on the first launch after an update (`WHATS_NEW_ID`); dismiss with Select or a tap anywhere
 - Resume in-progress session on launch: RESTORE prompt (Resume, New) appears, accepting goes straight to the rucking screen (not the profile screen)
 - Step counting from Pebble Health, updated roughly every 10 seconds
 - Lifetime totals accumulate correctly across sessions
@@ -95,5 +95,6 @@ Schema version: **2**
 - The Pebble SDK Python venv can break when macOS upgrades Python. Fix: `ln -sf $(which python3.13) /path/to/sdk/.venv/bin/python`. Must point to 3.13 specifically (not `python3` which may be 3.14+).
 - Timeline pins use `Date.now() + 120000` as the pin time (2 minutes in the future) as a workaround for Pebble timeline ordering — the exact timestamp isn't used for display but must be in the future.
 - Step counts are from Pebble Health and lag by ~10 seconds. The rucking screen shows "NB. Steps are updated every ten seconds or so" in the explainer.
-- Heart rate shows `--` when no recent reading exists (Pebble Health doesn't guarantee continuous HR).
+- Heart rate shows `--` when no recent reading exists. App now requests a 1s HR sample period via `health_service_set_heart_rate_sample_period()` while subscribed (cancelled on unsubscribe/deinit) — without it, readings depended on the system's own sampling cadence regardless of the phone's "track HR in activities" setting (that setting only governs Workout-flagged sessions).
+- What's-new popup ("Down &gt; Watch leaves your ruck running" wording, `WHATS_NEW_ID`) intermittently not appearing on a real watch relaunch with a resumable session, despite the code path looking correct — under investigation with added `APP_LOG` around `prv_maybe_show_whats_new`. Current theory: the persisted "seen" flag gets written before the window is confirmed visible, so an earlier unnoticed/interrupted show burns it permanently for that ID.
 - `convertRuckWeightValues` in the settings page converts in-flight input field values when ruck weight unit changes, but `renderProfileList()` immediately rebuilds from `draftProfiles` (which already has the correct kg-tenths value), so `convertRuckWeightValues` is technically redundant. It's kept because removing it broke the live page (likely a timing or edge-case dependency not yet identified).
