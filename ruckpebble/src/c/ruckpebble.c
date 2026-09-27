@@ -70,7 +70,7 @@ enum {
 };
 
 // Bump WHATS_NEW_ID (and edit the text) to show the pop-up once after an update.
-#define WHATS_NEW_ID 2
+#define WHATS_NEW_ID 3
 #define WHATS_NEW_TEXT "Auto pause & resume when you stop and start moving.\n\nDown > Watch leaves your ruck running.\n\nFull release notes in the Pebble app store."
 
 
@@ -2140,13 +2140,18 @@ static void prv_whats_new_window_unload(Window *window) {
 // Shown once per WHATS_NEW_ID on existing installs; fresh installs just record it.
 static void prv_maybe_show_whats_new(bool existing_install) {
   int32_t seen = persist_exists(WHATS_NEW_SEEN_PERSIST_KEY) ? persist_read_int(WHATS_NEW_SEEN_PERSIST_KEY) : 0;
+  APP_LOG(APP_LOG_LEVEL_INFO, "whats_new: seen=%ld id=%d existing_install=%d",
+          (long)seen, (int)WHATS_NEW_ID, (int)existing_install);
   if (seen >= WHATS_NEW_ID) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "whats_new: skipped, already seen");
     return;
   }
   persist_write_int(WHATS_NEW_SEEN_PERSIST_KEY, WHATS_NEW_ID);
   if (!existing_install) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "whats_new: skipped, fresh install");
     return;
   }
+  APP_LOG(APP_LOG_LEVEL_INFO, "whats_new: pushing window");
   s_whats_new_window = window_create();
   window_set_background_color(s_whats_new_window, GColorBlack);
   window_set_window_handlers(s_whats_new_window, (WindowHandlers) {
