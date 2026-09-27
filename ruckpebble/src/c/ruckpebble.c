@@ -144,6 +144,9 @@ static int16_t s_profile_cell_height = PROFILE_ROW_HEIGHT;
 static bool s_profile_touch_active = false;
 static int16_t s_profile_touch_start_x = 0;
 static int16_t s_profile_touch_start_y = 0;
+static bool s_ruck_prompt_touch_active = false;
+static int16_t s_ruck_prompt_touch_start_x = 0;
+static int16_t s_ruck_prompt_touch_start_y = 0;
 
 static Settings s_settings;
 static bool s_session_active = false;
@@ -1689,6 +1692,75 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   }
 }
 
+static int32_t prv_ruck_prompt_row_for_touch_y(int16_t touch_y) {
+  const int16_t pad = 8;
+  const int16_t heading_h = 30;
+  const int16_t row_h = 40;
+  const int16_t row_span = row_h + 6;
+  int16_t y_in_rows = touch_y - (pad + heading_h);
+  int32_t max_row = (s_ruck_prompt_mode == RUCK_PROMPT_MODE_RESTORE) ? 1 : 2;
+  int32_t row;
+
+  if (y_in_rows < 0) {
+    return -1;
+  }
+
+  row = y_in_rows / row_span;
+  if (row < 0 || row > max_row) {
+    return -1;
+  }
+
+  if ((y_in_rows % row_span) >= row_h) {
+    return -1;
+  }
+
+  return row;
+}
+
+static void prv_ruck_prompt_touch_handler(const TouchEvent *event, void *context) {
+  (void)context;
+
+  if (!s_ruck_prompt_layer || !event) {
+    return;
+  }
+
+  if (event->type == TouchEvent_Touchdown) {
+    s_ruck_prompt_touch_active = true;
+    s_ruck_prompt_touch_start_x = event->x;
+    s_ruck_prompt_touch_start_y = event->y;
+    return;
+  }
+
+  if (!s_ruck_prompt_touch_active) {
+    return;
+  }
+
+  if (event->type == TouchEvent_PositionUpdate) {
+    int16_t dx = event->x - s_ruck_prompt_touch_start_x;
+    int16_t dy = event->y - s_ruck_prompt_touch_start_y;
+    if (abs(dx) > 12 || abs(dy) > 12) {
+      s_ruck_prompt_touch_active = false;
+    }
+    return;
+  }
+
+  if (event->type == TouchEvent_Liftoff) {
+    int16_t dx = event->x - s_ruck_prompt_touch_start_x;
+    int16_t dy = event->y - s_ruck_prompt_touch_start_y;
+    int32_t row = prv_ruck_prompt_row_for_touch_y(s_ruck_prompt_touch_start_y);
+
+    s_ruck_prompt_touch_active = false;
+
+    if (abs(dx) > 12 || abs(dy) > 12 || row < 0) {
+      return;
+    }
+
+    s_ruck_prompt_selected_row = row;
+    layer_mark_dirty(s_ruck_prompt_layer);
+    prv_ruck_prompt_select();
+  }
+}
+
 static void prv_checkin_repeat_timer_callback(void *data) {
   (void)data;
   s_checkin_repeat_timer = NULL;
@@ -1716,6 +1788,10 @@ static void prv_ruck_prompt_window_load(Window *window) {
     s_checkin_repeat_elapsed_s = 0;
     s_checkin_repeat_timer = app_timer_register(RUCK_CHECKIN_REPEAT_MS, prv_checkin_repeat_timer_callback, NULL);
   }
+  if (touch_service_is_enabled()) {
+    s_ruck_prompt_touch_active = false;
+    touch_service_subscribe(prv_ruck_prompt_touch_handler, NULL);
+  }
 }
 
 static void prv_ruck_prompt_window_unload(Window *window) {
@@ -1724,6 +1800,10 @@ static void prv_ruck_prompt_window_unload(Window *window) {
     app_timer_cancel(s_checkin_repeat_timer);
     s_checkin_repeat_timer = NULL;
   }
+  if (touch_service_is_enabled()) {
+    touch_service_unsubscribe();
+  }
+  s_ruck_prompt_touch_active = false;
   layer_destroy(s_ruck_prompt_layer);
   s_ruck_prompt_layer = NULL;
 }
