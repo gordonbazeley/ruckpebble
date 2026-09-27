@@ -1516,12 +1516,12 @@ static void prv_ruck_prompt_discard(void) {
 
 static void prv_ruck_prompt_select(void) {
   if (s_ruck_prompt_mode == RUCK_PROMPT_MODE_DOWN) {
-    // Order: Save, Watch, Discard. Watch exits to the watchface; deinit
+    // Order: Watch, Save, Discard. Watch exits to the watchface; deinit
     // persists the session and the 1-minute wakeup brings the app back.
     if (s_ruck_prompt_selected_row == 0) {
-      prv_ruck_prompt_save();
-    } else if (s_ruck_prompt_selected_row == 1) {
       window_stack_pop_all(true);
+    } else if (s_ruck_prompt_selected_row == 1) {
+      prv_ruck_prompt_save();
     } else {
       prv_ruck_prompt_discard();
     }
@@ -1640,7 +1640,7 @@ static void prv_ruck_prompt_layer_update_proc(Layer *layer, GContext *ctx) {
   const int16_t row_w = bounds.size.w - 2 * pad;
 
   static const char *k_titles_back[]    = { "Discard", "Save", "Resume" };
-  static const char *k_titles_down[]    = { "Save", "Watch", "Discard" };
+  static const char *k_titles_down[]    = { "Watch", "Save", "Discard" };
   static const char *k_titles_restore[] = { "Resume", "New" };
   static const char *k_titles_checkin[] = { "Resume", "Discard", "Save" };
   const char **titles;

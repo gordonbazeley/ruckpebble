@@ -14,7 +14,7 @@ Schema version: **2**
 - Rucking screen shows: profile name, session pace, current pace (60s rolling), steps (session + today), current time, distance, heart rate, elapsed time, calories (ruck + walk comparison)
 - Pause / resume (up button)
 - Save/Resume/Discard prompt, shown in 4 cases, each with its own item order (see `dev_docs/architecture.md` § Ruck Prompt Modes):
-  - Down button pressed: Save, Watch (exit to watchface, ruck keeps going), Discard
+  - Down button pressed: Watch (exit to watchface, ruck keeps going), Save, Discard
   - Back button pressed: Discard, Save, Resume
   - App not opened for 1 minute (wakeup-scheduled check-in): Resume, Discard, Save. With auto pause on, the wakeup goes straight back to the ruck screen instead.
   - No step-count change for 1 minute mid-ruck (stillness check-in): Resume, Discard, Save. Only when Auto pause and resume is off.

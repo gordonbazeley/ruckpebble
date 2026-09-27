@@ -43,7 +43,7 @@ Every mode shows a "RuckPebble" title heading above the items. Item labels are s
 
 | Mode | Trigger | Item order |
 |---|---|---|
-| DOWN | Down button pressed on the rucking screen | Save, Watch, Discard |
+| DOWN | Down button pressed on the rucking screen | Watch, Save, Discard |
 | BACK | Back button pressed on the rucking screen | Discard, Save, Resume |
 | CHECKIN | App not opened for 1 min (wakeup-scheduled relaunch, only when auto pause is off), or no step-count change for 1 min while foregrounded (stillness check, only when the Auto pause and resume setting is off) | Resume, Discard, Save |
 | RESTORE | In-progress session found on launch | Resume, New |
