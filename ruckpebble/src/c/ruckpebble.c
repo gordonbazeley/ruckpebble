@@ -238,6 +238,9 @@ static void prv_ensure_health_subscription(time_t now) {
   if (available && !s_health_subscribed) {
     health_service_events_subscribe(prv_health_handler, NULL);
     s_health_subscribed = true;
+    // Ask for live BPM updates; system default cadence can otherwise leave
+    // HealthMetricHeartRateBPM stale regardless of the phone's HR setting.
+    health_service_set_heart_rate_sample_period(1);
   }
   s_health_available = available;
 }
@@ -2297,6 +2300,7 @@ static void prv_deinit(void) {
   }
   tick_timer_service_unsubscribe();
   if (s_health_subscribed) {
+    health_service_set_heart_rate_sample_period(0);
     health_service_events_unsubscribe();
     s_health_subscribed = false;
   }
