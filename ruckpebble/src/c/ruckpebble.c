@@ -2144,6 +2144,51 @@ static void prv_whats_new_click_handler(ClickRecognizerRef recognizer, void *con
   window_stack_remove(s_whats_new_window, true);
 }
 
+static bool s_whats_new_touch_active = false;
+static int16_t s_whats_new_touch_start_x = 0;
+static int16_t s_whats_new_touch_start_y = 0;
+
+static void prv_whats_new_touch_handler(const TouchEvent *event, void *context) {
+  (void)context;
+
+  if (!event) {
+    return;
+  }
+
+  if (event->type == TouchEvent_Touchdown) {
+    s_whats_new_touch_active = true;
+    s_whats_new_touch_start_x = event->x;
+    s_whats_new_touch_start_y = event->y;
+    return;
+  }
+
+  if (!s_whats_new_touch_active) {
+    return;
+  }
+
+  if (event->type == TouchEvent_PositionUpdate) {
+    int16_t dx = event->x - s_whats_new_touch_start_x;
+    int16_t dy = event->y - s_whats_new_touch_start_y;
+    if (abs(dx) > 12 || abs(dy) > 12) {
+      s_whats_new_touch_active = false;
+    }
+    return;
+  }
+
+  if (event->type == TouchEvent_Liftoff) {
+    int16_t dx = event->x - s_whats_new_touch_start_x;
+    int16_t dy = event->y - s_whats_new_touch_start_y;
+
+    s_whats_new_touch_active = false;
+
+    if (abs(dx) > 12 || abs(dy) > 12) {
+      return;
+    }
+
+    window_stack_remove(s_whats_new_window, true);
+  }
+}
+
 // Up/Down scroll (ScrollLayer's own handlers); Select = OK.
 static void prv_whats_new_click_config_provider(void *context) {
   (void)context;
@@ -2205,10 +2250,19 @@ static void prv_whats_new_window_load(Window *window) {
 
   scroll_layer_set_content_size(s_whats_new_scroll_layer,
                                 GSize(bounds.size.w, ok_y + ok_h + PBL_IF_ROUND_ELSE(24, 8)));
+
+  if (touch_service_is_enabled()) {
+    s_whats_new_touch_active = false;
+    touch_service_subscribe(prv_whats_new_touch_handler, NULL);
+  }
 }
 
 static void prv_whats_new_window_unload(Window *window) {
   (void)window;
+  if (touch_service_is_enabled()) {
+    touch_service_unsubscribe();
+  }
+  s_whats_new_touch_active = false;
   text_layer_destroy(s_whats_new_title_layer);
   text_layer_destroy(s_whats_new_body_layer);
   layer_destroy(s_whats_new_ok_layer);
