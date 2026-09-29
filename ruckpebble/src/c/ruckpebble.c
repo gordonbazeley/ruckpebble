@@ -16,6 +16,7 @@
 #define RUCK_CHECKIN_REPEAT_TIMEOUT_S 180
 #define RUCK_STILLNESS_TIMEOUT_S 60
 #define RUCK_AUTO_RESUME_MIN_STEPS 5  // ignore fidgets while auto-paused
+#define RUCK_AUTO_RESUME_FIDGET_S 30   // no new steps this long while auto-paused = fidget, not walking
 
 typedef struct {
   int32_t ruck_weight_value;  // tenths
@@ -171,6 +172,12 @@ static bool s_auto_paused = false;
 static time_t s_pause_start_time = 0;
 static int32_t s_pause_total_s = 0;
 static int32_t s_steps_at_pause = 0;
+// Auto-resume run tracking: live steps before the current run of movement, when it
+// was first seen, and when steps last rose. Lets auto-resume keep the run's steps.
+static int32_t s_resume_run_from_steps = 0;
+static time_t s_resume_run_start_time = 0;
+static time_t s_resume_run_last_step_time = 0;
+static int32_t s_resume_run_last_steps = 0;
 static int32_t s_steps_at_last_movement = 0;
 static time_t s_last_movement_time = 0;
 static Layer *s_paused_icon_layer = NULL;
@@ -973,15 +980,26 @@ static void prv_pause_session(time_t now, time_t pause_start) {
   s_pause_start_time = pause_start;
   s_steps_at_pause = prv_live_session_steps(now);
   s_session_paused = true;
+  s_resume_run_from_steps = s_steps_at_pause;
+  s_resume_run_last_steps = s_steps_at_pause;
+  s_resume_run_start_time = 0;
+  s_resume_run_last_step_time = 0;
 }
 
-static void prv_resume_session(time_t now) {
-  s_pause_total_s += (int32_t)(now - s_pause_start_time);
-  int32_t steps_since_baseline_at_pause = s_steps_at_pause - s_session_steps_offset;
-  if (steps_since_baseline_at_pause < 0) {
-    steps_since_baseline_at_pause = 0;
+// pause_end may be backdated (auto-resume) to when movement started. Session steps
+// continue from s_steps_at_pause plus any live steps above run_from_steps; a manual
+// resume passes the current live steps so steps taken while paused are dropped.
+static void prv_resume_session(time_t now, time_t pause_end, int32_t run_from_steps) {
+  s_pause_total_s += (int32_t)(pause_end - s_pause_start_time);
+  int32_t kept_steps = prv_live_session_steps(now) - run_from_steps;
+  if (kept_steps < 0) {
+    kept_steps = 0;
   }
-  s_steps_baseline = prv_current_step_count(now) - steps_since_baseline_at_pause;
+  int32_t steps_since_baseline = s_steps_at_pause + kept_steps - s_session_steps_offset;
+  if (steps_since_baseline < 0) {
+    steps_since_baseline = 0;
+  }
+  s_steps_baseline = prv_current_step_count(now) - steps_since_baseline;
   s_last_time = 0;
   s_session_paused = false;
   s_auto_paused = false;
@@ -995,10 +1013,26 @@ static void prv_check_ruck_stillness(time_t now) {
   }
   if (s_session_paused) {
     // Manual pauses (Up button) are never auto-resumed.
-    if (s_auto_paused &&
-        prv_live_session_steps(now) - s_steps_at_pause >= RUCK_AUTO_RESUME_MIN_STEPS) {
-      APP_LOG(APP_LOG_LEVEL_INFO, "Auto-resume: movement detected");
-      prv_resume_session(now);
+    if (!s_auto_paused) {
+      return;
+    }
+    int32_t live_steps = prv_live_session_steps(now);
+    if (live_steps > s_resume_run_last_steps) {
+      if (s_resume_run_start_time == 0) {
+        s_resume_run_start_time = now;
+      }
+      s_resume_run_last_steps = live_steps;
+      s_resume_run_last_step_time = now;
+    } else if (s_resume_run_start_time != 0 &&
+               now - s_resume_run_last_step_time >= RUCK_AUTO_RESUME_FIDGET_S) {
+      // A few steps then stillness again: drop them and wait for a fresh run.
+      s_resume_run_from_steps = live_steps;
+      s_resume_run_start_time = 0;
+    }
+    if (live_steps - s_resume_run_from_steps >= RUCK_AUTO_RESUME_MIN_STEPS) {
+      APP_LOG(APP_LOG_LEVEL_INFO, "Auto-resume: movement detected, kept %ld steps from %lds ago",
+              (long)(live_steps - s_resume_run_from_steps), (long)(now - s_resume_run_start_time));
+      prv_resume_session(now, s_resume_run_start_time, s_resume_run_from_steps);
       vibes_short_pulse();
       prv_update_display();
     }
@@ -1917,7 +1951,7 @@ static void prv_main_up_click_handler(ClickRecognizerRef recognizer, void *conte
   if (!s_session_active) return;
   time_t now = time(NULL);
   if (s_session_paused) {
-    prv_resume_session(now);
+    prv_resume_session(now, now, prv_live_session_steps(now));
   } else {
     prv_pause_session(now, now);
   }

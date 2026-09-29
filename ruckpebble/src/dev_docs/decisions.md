@@ -128,6 +128,6 @@ Decisions that aren't obvious from the code, with the reasoning behind them.
 
 **Decision:** With `auto_pause_enabled` on (default), 60s without steps auto-pauses the session instead of showing the CHECKIN prompt. The pause start is backdated to the last detected step, and it auto-resumes after 5 new steps. A pause the user started with Up is never auto-resumed. When off, the CHECKIN prompt fires after the same 60s.
 
-**Why:** Stopping mid-ruck (traffic, water, a chat) shouldn't need a button press twice, and the idle minute shouldn't count toward duration or pace. The 5-step threshold avoids resuming on a fidget. Manual pauses are an explicit intent, so movement doesn't override them.
+**Why:** Stopping mid-ruck (traffic, water, a chat) shouldn't need a button press twice, and the idle minute shouldn't count toward duration or pace. The 5-step threshold avoids resuming on a fidget. The steps that trigger an auto-resume are kept and the pause ends when they started; previously they were dropped along with the ~10s health lag, losing ~20 steps and ~10s of active time per resume. Manual pauses are an explicit intent, so movement doesn't override them.
 
 **Storage:** `auto_pause_enabled` is appended as the last `Settings` field so older, shorter persisted blobs load with the default; `APP_STATE_SCHEMA_VERSION` was not bumped because that wipes lifetime totals.

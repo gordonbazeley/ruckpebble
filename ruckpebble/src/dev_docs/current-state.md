@@ -18,7 +18,7 @@ Schema version: **2**
   - Back button pressed: Discard, Save, Resume
   - App not opened for 1 minute (wakeup-scheduled check-in): Resume, Discard, Save. With auto pause on, the wakeup goes straight back to the ruck screen instead.
   - No step-count change for 1 minute mid-ruck (stillness check-in): Resume, Discard, Save. Only when Auto pause and resume is off.
-- Auto pause and resume (phone setting, default on): pauses after 60s without steps (backdated to the last step), resumes after 5 new steps. Manual (Up) pauses stay paused.
+- Auto pause and resume (phone setting, default on): pauses after 60s without steps (backdated to the last step), resumes after 5 new steps, keeping those steps and ending the pause when they started (steps followed by 30s of stillness are ignored as a fidget). Manual (Up) pauses stay paused.
   - Save writes totals to persistent storage and sends activity data to phone; Discard clears the session
 - Time away from the app counts as active only if you took 5+ steps during it (same day); otherwise it's treated as paused
 - One-time "What's new" pop-up on the first launch after an update (`WHATS_NEW_ID`); dismiss with Select or a tap anywhere
