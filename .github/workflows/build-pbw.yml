@@ -1,0 +1,32 @@
+name: Build pbw
+
+on:
+  push:
+    branches: [main]
+    paths: [ruckpebble/**]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: astral-sh/setup-uv@v5
+      - name: Install Pebble SDK
+        run: |
+          uv tool install pebble-tool
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          yes | pebble sdk install latest
+      - name: Build
+        working-directory: ruckpebble
+        run: pebble build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ruckpebble-pbw
+          path: ruckpebble/build/*.pbw
