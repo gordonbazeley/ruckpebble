@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -30,3 +30,11 @@ jobs:
         with:
           name: ruckpebble-pbw
           path: ruckpebble/build/*.pbw
+      - name: Publish to the "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest ruckpebble/build/*.pbw \
+            --prerelease --title "Latest build" \
+            --notes "Built from ${GITHUB_SHA::7}."
