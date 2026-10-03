@@ -126,7 +126,7 @@ Decisions that aren't obvious from the code, with the reasoning behind them.
 
 ## Auto pause replaces the stillness prompt by default
 
-**Decision:** With `auto_pause_enabled` on (default), 60s without steps auto-pauses the session instead of showing the CHECKIN prompt. The pause start is backdated to the last detected step, and it auto-resumes after 5 new steps. A pause the user started with Up is never auto-resumed. When off, the CHECKIN prompt fires after the same 60s.
+**Decision:** With `auto_pause_enabled` on (default), 60s without steps auto-pauses the session instead of showing the CHECKIN prompt. The pause start is backdated to the last detected step, and it auto-resumes after 5 new steps. A pause the user started with Up is never auto-resumed. When off, the CHECKIN prompt fires after the same 60s. This only covers stillness while foregrounded: a wakeup relaunch (user left via Watch or another app) always shows CHECKIN, since auto-resuming would grab control from an app the user chose to open.
 
 **Why:** Stopping mid-ruck (traffic, water, a chat) shouldn't need a button press twice, and the idle minute shouldn't count toward duration or pace. The 5-step threshold avoids resuming on a fidget. The steps that trigger an auto-resume are kept and the pause ends when they started; previously they were dropped along with the ~10s health lag, losing ~20 steps and ~10s of active time per resume. Manual pauses are an explicit intent, so movement doesn't override them.
 

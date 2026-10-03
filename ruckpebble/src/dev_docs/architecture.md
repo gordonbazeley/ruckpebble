@@ -45,11 +45,11 @@ Every mode shows a "RuckPebble" title heading above the items. Item labels are s
 |---|---|---|
 | DOWN | Down button pressed on the rucking screen | Watch, Save, Discard |
 | BACK | Back button pressed on the rucking screen | Discard, Save, Resume |
-| CHECKIN | App not opened for 1 min (wakeup-scheduled relaunch, only when auto pause is off), or no step-count change for 1 min while foregrounded (stillness check, only when the Auto pause and resume setting is off) | Resume, Discard, Save |
+| CHECKIN | App not opened for 1 min (wakeup-scheduled relaunch, regardless of auto pause), or no step-count change for 1 min while foregrounded (stillness check, only when the Auto pause and resume setting is off) | Resume, Discard, Save |
 | RESTORE | In-progress session found on launch | Resume, New |
 
 CHECKIN has two distinct triggers that share one mode and one item order:
-- **1-minute app-not-opened**: on `prv_deinit` mid-session, a `wakeup_schedule` is set for `RUCK_CHECKIN_INTERVAL_S` (60s); on relaunch, if `launch_reason() == APP_LAUNCH_WAKEUP`, mode is set to CHECKIN instead of RESTORE. With `auto_pause_enabled` on, a wakeup relaunch skips the prompt entirely: `prv_init` resumes the session and shows the rucking screen with a short vibe.
+- **1-minute app-not-opened**: on `prv_deinit` mid-session, a `wakeup_schedule` is set for `RUCK_CHECKIN_INTERVAL_S` (60s); on relaunch, if `launch_reason() == APP_LAUNCH_WAKEUP`, mode is set to CHECKIN instead of RESTORE. This happens even with `auto_pause_enabled` on: the user chose to leave, so we ask before taking control back.
 - **1-minute no-steps**: `prv_check_ruck_stillness`, polled every second from the tick handler, pushes the CHECKIN prompt once step count hasn't changed for `RUCK_STILLNESS_TIMEOUT_S` (60s) while a session is active and foregrounded. This only happens when `auto_pause_enabled` is off.
 
 ### Auto pause and resume
