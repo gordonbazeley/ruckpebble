@@ -87,7 +87,7 @@ The current `settings_about_you.png` screenshot shows the full settings page wit
 ## Infrastructure
 
 ### GitHub Actions for build
-No CI currently. A GitHub Actions workflow that runs `pebble build` would catch C compile errors on push. The Pebble SDK can be installed in a container.
+Done: a workflow in `.github/workflows/` builds the pbw and publishes it to a rolling "latest" release.
 
 ### App store listing update
 The store `.pbw` file in `resources/store/` should be updated whenever the version in `package.json` changes. Check whether the current `ruckpebble.pbw` matches version 1.4.2.

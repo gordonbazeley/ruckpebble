@@ -1,68 +1,33 @@
 # Repository Guidelines
-* There are two screens to the app
-  * Profile - this is the first screen which shows when the app starts where you select Profile
-  * Ruck - this is the running ruck screen which shows when you select a profile
+* Two screens: **Profile** (first screen at launch; pick a profile) and **Ruck** (the running ruck, shown after selecting a profile).
 
-## Project Structure & Module Organization
-- `src/c/`: Pebble app source in C (entry point is `src/c/ruckpebble.c`).
-- `src/pkjs/` and `src/common/`: optional JavaScript companion code if added later (referenced by `wscript`).
-- `wscript`: Pebble SDK build rules and bundle configuration.
-- `package.json`: Pebble metadata (targets, UUID, resources).
-- `src/dev_docs/`: project context that should be treated as required reading before future changes. Review `architecture.md`, `decisions.md`, `current-state.md`, and `todo.md` together with the code they describe, and keep implementation work aligned with them.
+## Project Structure
+Paths are relative to the Pebble project root (the parent of this `src/` dir, where `package.json` and `wscript` live). Run all `pebble` commands from there.
+- `src/c/ruckpebble.c`: watchapp source (C), entry point.
+- `src/pkjs/index.js`: phone-side JS companion (config page, messaging).
+- `wscript`: build rules; post-build hook minifies phone JS and copies the pbw to `~/Nextcloud/pbws/` (skipped if missing).
+- `package.json`: metadata, UUID, `targetPlatforms` (emery, gabbro), `messageKeys`, `resources.media`. Update the last two when adding app messages or assets.
+- `../.github/workflows/` (git repo root, one level above the project root): CI builds the pbw and publishes it to a rolling "latest" release.
+- `src/dev_docs/`: read the relevant file before changing the area it covers, and keep it current.
+  - `architecture.md` — structure/data flow; `decisions.md` — why things are the way they are; `current-state.md` — what works now; `todo.md` — planned work.
 
-## Build, Test, and Development Commands
-You have my permissions to always run commands that start with pebble
-- `pebble build`: Compile the watchapp using the Pebble SDK and `wscript`. 
-- `pebble install --emulator <platform>`: Build and install to an emulator (e.g., `basalt`).
-- `pebble clean`: Remove `build/` artifacts.
-- `pebble logs`: Stream device/emulator logs for runtime debugging.
-- `./scripts/emu-logs.sh`: Preferred logs command for config debugging (includes pypkjs output).
-- `pebble emu-app-config --emulator emery`: Open emulator app config in the default browser (Safari).
-- After every successful `pebble build`, always run `pebble install --emulator emery`.
-- Every successful `pebble build` drops the JS source map, minifies the phone JS in `build/ruckpebble.pbw`, and copies it to `~/Nextcloud/pbws/` (post-build hook in `wscript`; copy skipped if that folder doesn't exist).
+## Commands
+Run any `pebble` command, `git`, and standard shell utilities without asking.
+- `pebble build`, then always `pebble install --emulator emery` (use `gabbro` only when testing that platform).
+- `pebble clean`, `pebble logs --emulator emery` (also `src/logs.sh`), `pebble emu-app-config --emulator emery` (opens settings in the default browser).
+- `src/run.sh [emery|gabbro]` builds and installs with an install timeout.
 
-## Runbook (Commands To Run)
-- "rs" - run the emulator and settings
-- Run emulator app:
-  - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
-  - `pebble build`
-  - `pebble install --emulator emery`
-- Open settings (Safari/default browser):
-  - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
-  - `pebble emu-app-config --emulator emery`
-- Review logs (watch + pkjs):
-  - `cd /Users/gordonbazeley/src/ruckpebble/ruckpebble`
-  - `./scripts/emu-logs.sh`
+## Shortcuts
+- `rs` — build, install to the emulator, then open settings.
+- `cp` / "commit and push" — stage all changes, commit with a useful message, `git push origin`, no confirmation needed.
 
-## Approved Commands
-All permissions granted — run any command needed to build, debug, and test the app without asking. This includes:
-- Any `pebble` command (build, install, logs, screenshot, emu-button, emu-app-config, clean, etc.)
-- Any `git` command on this repo
-- Standard shell utilities: `sleep`, `grep`, `cat`, `ps`, `kill`, `pkill`, `open`, `osascript`, `/bin/bash -lc "..."`, etc.
-- `./scripts/emu-logs.sh` and any script in the repo
+## Coding Style
+- C with Pebble SDK (`pebble.h`); 2-space indent, K&R braces.
+- `s_` prefix for static globals, `prv_` for internal functions.
 
-## Coding Style & Naming Conventions
-- Language: C for watchapp logic; follow Pebble SDK APIs (`pebble.h`).
-- Indentation: 2 spaces, K&R-style braces as seen in `src/c/ruckpebble.c`.
-- Naming: `s_` prefix for static globals, `prv_` prefix for internal functions.
-- Keep functions small and event-driven (handlers, load/unload, init/deinit).
-
-
-## Testing Guidelines
-- No automated test framework is configured in this repository.
-- Validate behavior by running in the emulator and checking `pebble logs`.
-- If you add tests, document the runner and required commands here.
+## Testing
+No automated tests. Validate in the emulator and check `pebble logs`.
 
 ## Git
-* If I ask you to "commit and push" or "cp" then do the following (without requesting permission)
-  * Stage all changed files
-  * Add a useful commit message
-  * git push origin
-- `origin` now points to `https://github.com/gordonbazeley/ruckpebble.git`.
-- Git history only shows “Initial …” commits; no formal convention established.
-- Use short, imperative summaries (e.g., “Add button handlers”).
-- PRs should include a clear description, affected platforms, and emulator screenshots for UI changes.
-
-## Configuration & Targets
-- Supported platforms live in `package.json` under `pebble.targetPlatforms`.
-- Update `messageKeys` and `resources.media` when adding app messages or assets.
+- Short, imperative commit summaries (e.g. "Add button handlers").
+- PRs: clear description, affected platforms, emulator screenshots for UI changes.
