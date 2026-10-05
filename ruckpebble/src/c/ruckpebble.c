@@ -2435,7 +2435,15 @@ static void prv_init(void) {
 
   window_stack_push(s_window, false);
 
+  // Wakeup relaunch (user left via Watch or the app was killed) with auto
+  // pause on: go straight back to the ruck; auto pause/resume handles stillness.
   bool resumable = prv_has_resumable_session_for_profile(prv_active_profile_index());
+  if (resumable && launch_reason_val == APP_LAUNCH_WAKEUP && s_settings.auto_pause_enabled) {
+    prv_resume_in_progress_session();
+    prv_update_display();
+    vibes_short_pulse();
+    return;
+  }
 
   window_stack_push(s_profile_window, true);
 

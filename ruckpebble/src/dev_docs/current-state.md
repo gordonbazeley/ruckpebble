@@ -16,7 +16,7 @@ Schema version: **2**
 - Save/Resume/Discard prompt, shown in 4 cases, each with its own item order (see `dev_docs/architecture.md` § Ruck Prompt Modes) — buttons or tap a row:
   - Down button pressed: Watch (exit to watchface, ruck keeps going), Save, Discard
   - Back button pressed: Discard, Save, Resume
-  - App not opened for 1 minute (wakeup-scheduled check-in): Resume, Discard, Save. Applies with auto pause on too: leaving the app is never silently resumed.
+  - App not opened for 1 minute (wakeup-scheduled check-in): Resume, Discard, Save. With auto pause on, the wakeup goes straight back to the ruck screen instead.
   - No step-count change for 1 minute mid-ruck (stillness check-in): Resume, Discard, Save. Only when Auto pause and resume is off.
 - Auto pause and resume (phone setting, default on): pauses after 60s without steps (backdated to the last step), resumes after 5 new steps, keeping those steps and ending the pause when they started (steps followed by 30s of stillness are ignored as a fidget). Manual (Up) pauses stay paused.
   - Save writes totals to persistent storage and sends activity data to phone; Discard clears the session
