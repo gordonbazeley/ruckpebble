@@ -43,8 +43,10 @@ SETTINGS_SECTIONS = [
 SETTINGS_SECTION_NAMES = {s["name"] for s in SETTINGS_SECTIONS}
 
 
-def load_font(size, bold=False):
+def load_font(size, bold=False, italic=False):
     candidates = []
+    if italic:
+        candidates.append("/System/Library/Fonts/Supplemental/Arial Italic.ttf")
     if bold:
         candidates.extend([
             "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
@@ -141,11 +143,68 @@ def wrap_text(draw, text, font, width):
 BULLET = "•"
 
 
+def parse_words(text):
+    """Split text into [(word, italic)]; *...* toggles italics (may span words)."""
+    words = []
+    italic = False
+    cur, cur_italic = "", False
+    for ch in text:
+        if ch == "*":
+            italic = not italic
+        elif ch.isspace():
+            if cur:
+                words.append((cur, cur_italic))
+            cur, cur_italic = "", False
+        else:
+            cur += ch
+            cur_italic = cur_italic or italic
+    if cur:
+        words.append((cur, cur_italic))
+    return words
+
+
+def italic_font(font):
+    return load_font(font.size, italic=True)
+
+
+def tokens_width(draw, tokens, font):
+    """Width of [(word, italic)] joined by spaces."""
+    ifont = italic_font(font)
+    space = draw.textlength(" ", font=font)
+    return sum(draw.textlength(w, font=ifont if it else font) for w, it in tokens) + space * max(0, len(tokens) - 1)
+
+
+def draw_tokens(draw, xy, tokens, font, fill):
+    x, y = xy
+    ifont = italic_font(font)
+    space = draw.textlength(" ", font=font)
+    for w, it in tokens:
+        f = ifont if it else font
+        draw.text((x, y), w, fill=fill, font=f)
+        x += draw.textlength(w, font=f) + space
+
+
+def wrap_tokens(draw, words, font, first_avail, cont_avail):
+    """Greedy wrap of [(word, italic)] -> list of token lists."""
+    lines, current = [], []
+    for word in words:
+        avail = first_avail if not lines else cont_avail
+        if current and tokens_width(draw, current + [word], font) > avail:
+            lines.append(current)
+            current = [word]
+        else:
+            current.append(word)
+    if current:
+        lines.append(current)
+    return lines
+
+
 def layout_lines(draw, text, font, width):
-    """Returns list of (display_text, x_offset_px) for rendering.
+    """Returns list of (tokens, x_offset_px) for draw_tokens.
 
     Lines starting with '* ' become level-1 bullets; lines starting with
     two or more spaces then '* ' become level-2 bullets (indented further).
+    *word* renders in italics.
     """
     result = []
     if not text:
@@ -153,7 +212,7 @@ def layout_lines(draw, text, font, width):
 
     for raw_para in text.splitlines():
         if not raw_para.strip():
-            result.append(("", 0))
+            result.append(([], 0))
             continue
 
         stripped = raw_para.lstrip()
@@ -161,40 +220,19 @@ def layout_lines(draw, text, font, width):
 
         m_bullet = re.match(r"^\* (.+)$", stripped)
         if m_bullet:
-            bullet_text = m_bullet.group(1)
             indent_px = 20 if leading >= 2 else 0
-            prefix = f"{BULLET} "
-            prefix_w = int(draw.textlength(prefix, font=font))
+            prefix_w = int(draw.textlength(f"{BULLET} ", font=font))
             cont_x = indent_px + prefix_w
-
-            words = bullet_text.split()
-            current = ""
-            first = True
-            for word in words:
-                candidate = f"{current} {word}".strip()
-                avail = width - (indent_px if first else cont_x)
-                if draw.textlength(candidate, font=font) <= avail:
-                    current = candidate
+            lines = wrap_tokens(draw, parse_words(m_bullet.group(1)), font,
+                                width - indent_px, width - cont_x)
+            for i, toks in enumerate(lines):
+                if i == 0:
+                    result.append(([(BULLET, False)] + toks, indent_px))
                 else:
-                    if current:
-                        result.append((prefix + current if first else current, indent_px if first else cont_x))
-                        first = False
-                    current = word
-            if current:
-                result.append((prefix + current if first else current, indent_px if first else cont_x))
+                    result.append((toks, cont_x))
         else:
-            words = stripped.split()
-            current = ""
-            for word in words:
-                candidate = f"{current} {word}".strip()
-                if draw.textlength(candidate, font=font) <= width:
-                    current = candidate
-                else:
-                    if current:
-                        result.append((current, 0))
-                    current = word
-            if current:
-                result.append((current, 0))
+            for toks in wrap_tokens(draw, parse_words(stripped), font, width, width):
+                result.append((toks, 0))
 
     return result
 
@@ -207,8 +245,8 @@ def render_callout(draw, title_font, body_font, box, title, body, fill="#ffffff"
     draw.rounded_rectangle((bx, by, bx + bw, by + height), radius=10, fill=fill, outline=outline, width=2)
     draw.text((bx + padding, by + 12), title, fill=title_color, font=title_font)
     yy = by + 48
-    for line_text, x_off in lines:
-        draw.text((bx + padding + x_off, yy), line_text, fill=body_color, font=body_font)
+    for toks, x_off in lines:
+        draw_tokens(draw, (bx + padding + x_off, yy), toks, body_font, body_color)
         yy += 24
     return height
 
@@ -298,14 +336,14 @@ def render_screen(doc, screenshot_path, output_path):
     bx, by, bw, bh = footer_box
     footer_subtitle = footer.get("subtitle", "")
     footer_lines = layout_lines(draw, footer_subtitle, f_footer, bw - bx - 48) if footer_subtitle else []
-    footer_height = 14 + 24 + max(1, len(footer_lines)) * 24
+    footer_height = 14 + 24 + max(1, len(footer_lines)) * 24 + 12
     footer_box = (bx, by, bw, min(bh, by + footer_height))
     draw.rounded_rectangle(footer_box, radius=12, fill="#e6f0ff", outline="#8ab2e6", width=2)
     draw.text((bx + 24, by + 10), footer.get("title", ""), fill="#1f4f84", font=f_box_title)
     if footer_lines:
         yy = by + 38
-        for line_text, x_off in footer_lines:
-            draw.text((bx + 24 + x_off, yy), line_text, fill="#1f4f84", font=f_footer)
+        for toks, x_off in footer_lines:
+            draw_tokens(draw, (bx + 24 + x_off, yy), toks, f_footer, "#1f4f84")
             yy += 24
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

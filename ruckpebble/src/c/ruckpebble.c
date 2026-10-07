@@ -71,8 +71,8 @@ enum {
 };
 
 // Bump WHATS_NEW_ID (and edit the text) to show the pop-up once after an update.
-#define WHATS_NEW_ID 6
-#define WHATS_NEW_TEXT "Auto pause & resume when you stop and start moving.\n\nDown > Watch leaves your ruck running.\n\nFull release notes in the Pebble app store."
+#define WHATS_NEW_ID 7
+#define WHATS_NEW_TEXT "Auto pause & resume when you stop and start moving.\n\nDown > Watch lets you access other apps with your ruck running.\n\nFull release notes in the Pebble app store."
 
 
 #define APP_STATE_SCHEMA_VERSION 2

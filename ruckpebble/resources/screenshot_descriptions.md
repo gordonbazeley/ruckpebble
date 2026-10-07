@@ -55,8 +55,8 @@
 ## Footer
 - title: How to use
 - subtitle: ↑ Pauses the current ruck
-            ↓ Saves the current ruck session and creates a timeline pin
-            ← Discard current ruck session and return to profile screen
+            ↓ Choose between returning to the *Watch* (leaving the ruck running), *Save* or *Discard* the ruck
+            ← Choose between *Save*, *Discard* or *Resume* the ruck
 
 ---
 
