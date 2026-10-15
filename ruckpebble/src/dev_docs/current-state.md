@@ -40,7 +40,7 @@ Schema version: **2**
 - Profile cards show ruck weight, terrain, grade summary; pencil button opens inline editor
 - Profile editor: name, pack weight (with unit suffix), grade, terrain dropdown
 - Calorie chart (Calories tab) shows estimated kcal/hr at four pace options for all 3 profiles + walking baseline
-- History tab: lifetime distance/calories + last ruck details (read-only)
+- History tab: lifetime distance/calories + last ruck details (read-only), with "Log to Apple Health" and "Copy ruck data" buttons that hand the last ruck to the `Log Ruck` iOS Shortcut (untested on a real phone: the Pebble config webview may block the `shortcuts://` scheme, hence the clipboard fallback)
 - Info (ⓘ) buttons on: Units, Ruck weight units, Grade (per profile), Terrain (per profile)
 - Save changes button hidden on Calories and History tabs (visible only on Profiles tab)
 - Calorie values ≥ 10,000 formatted with comma separator

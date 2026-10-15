@@ -124,6 +124,16 @@ Decisions that aren't obvious from the code, with the reasoning behind them.
 
 ---
 
+## Rucks reach Apple Health via an iOS Shortcut, not the watchapp
+
+**Decision:** The settings page hands the last ruck to an iOS Shortcut (`Log Ruck`, "Log Workout" action) by `shortcuts://` link or clipboard. The app does not write to Apple Health itself.
+
+**Why:** The Core Devices/Pebble phone app syncs steps, heart rate, sleep and exercise sessions to Apple Health one way, but exercise sessions come only from PebbleOS-created activity overlays (`Walk`, `Run`, `OpenWorkout`: the built-in Workout app and auto-detected walks). `workout_service_start_workout` is only called by that system app, and the SDK `health_service` is read-only, so a third-party watchapp cannot create a session. The written record also has only start, end and type, no distance or calories. A Shortcut needs no Xcode or developer account and keeps distance, duration and kcal.
+
+**Consequences:** One tap per ruck. Pebble may also auto-log a "Walk" for the same window, so Apple Health can show a duplicate. A history log and bulk export (to backfill) is not built; see todo.md.
+
+---
+
 ## Auto pause replaces the stillness prompt by default
 
 **Decision:** With `auto_pause_enabled` on (default), 60s without steps auto-pauses the session instead of showing the CHECKIN prompt. The pause start is backdated to the last detected step, and it auto-resumes after 5 new steps. A pause the user started with Up is never auto-resumed. When off, the CHECKIN prompt fires after the same 60s. A wakeup relaunch (user left via Watch, a scheduled task, or the phone started another app) also auto-resumes when auto pause is on. We briefly asked before resuming in that case (Oct 3 2026) and reverted it: the prompt was more annoying than a silent resume, and auto pause handles stillness afterwards.

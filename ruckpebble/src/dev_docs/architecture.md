@@ -205,13 +205,20 @@ Hosted on **GitHub Pages** at `https://gordonbazeley.github.io/ruckpebble/config
 - **Saves via:** Navigates to `return_to + URL_ENCODED_JSON_PAYLOAD` when supplied, otherwise `pebblejs://close#URL_ENCODED_JSON_PAYLOAD`
 - Production uses the default `pebblejs://close#` path. `open_config.js` injects `return_to` so saves round-trip through its local HTTP server.
 
+### Apple Health hand-off (History tab)
+
+Nothing is written to Apple Health by the watchapp or phone JS. The page builds a JSON payload from the last-ruck state (`ahPayload()`): `{start (ISO, = save time minus duration), duration_s, distance_m, kcal}`.
+- **Log to Apple Health** navigates to `shortcuts://run-shortcut?name=Log%20Ruck&input=text&text=<payload>`.
+- **Copy ruck data** puts the same JSON on the clipboard; the Shortcut can read the clipboard instead.
+The `Log Ruck` iOS Shortcut (recipe in the README) runs Health's "Log Workout". No new message keys, no `pkjs/index.js` change.
+
 ### Tabs
 
 | Tab | Contents |
 |-----|----------|
 | Profiles | "About you" (body weight, units, stride) + 3 profile cards |
 | Calories | Bar chart of estimated kcal/hr per profile vs. walking baseline |
-| History | Lifetime totals + last ruck summary (read-only) |
+| History | Lifetime totals + last ruck summary (read-only), plus Apple Health hand-off buttons (see below) |
 
 ### Settings Data Flow in the Page
 

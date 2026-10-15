@@ -86,6 +86,9 @@ The current `settings_about_you.png` screenshot shows the full settings page wit
 
 ## Infrastructure
 
+### Ruck history log and bulk export for Apple Health
+Only the last ruck and lifetime totals are stored. Add a capped `ruck_log_v1` array in phone localStorage (appended in the `appmessage` handler when `isNewSave`), pass it to the config page, add an "Export rucks" JSON download, and wrap the `Log Ruck` Shortcut in a repeat-with-each for backfill. Check URL size limits when passing the log to the settings page.
+
 ### GitHub Actions for build
 Done: a workflow in `.github/workflows/` builds the pbw and publishes it to a rolling "latest" release.
 
