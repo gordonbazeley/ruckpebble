@@ -1954,6 +1954,8 @@ static void prv_main_up_click_handler(ClickRecognizerRef recognizer, void *conte
     prv_resume_session(now, now, prv_live_session_steps(now));
   } else {
     prv_pause_session(now, now);
+    // With auto pause on, a manual pause also auto-resumes after a few steps.
+    s_auto_paused = s_settings.auto_pause_enabled ? true : false;
   }
   prv_update_display();
 }
